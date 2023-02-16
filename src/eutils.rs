@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 use crossbeam_deque::Worker;
 use once_cell::sync::OnceCell;
@@ -102,6 +105,23 @@ pub async fn esearch(db: &str, query: &str) -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
+fn read_target_csv<P: AsRef<Path>>(
+    path: P,
+    v: &mut Vec<PaperCsvResult>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // let file = File::open(path)?;
+    let mut rdr = csv::ReaderBuilder::new()
+        .delimiter(b',')
+        .has_headers(true)
+        .from_path(path)?;
+    for result in rdr.deserialize() {
+        let ele: PaperCsvResult = result?;
+        v.push(ele);
+    }
+
+    Ok(())
+}
+
 pub async fn efetch(
     db: &str,
     ids: &Vec<String>,
@@ -109,7 +129,8 @@ pub async fn efetch(
     let mut v: Vec<PaperCsvResult> = Vec::new();
     for id in ids {
         let pmid = id.parse::<usize>()?;
-        if !file_exist(&get_pmid_path_by_id(pmid)) {
+        let path = get_pmid_path_by_id(pmid);
+        if !file_exist(&path) {
             let url = format!(
             "{}db={}&api_key=f6bc4f0e30a718d326ef842054d988ecdd08&retmode=text&rettype=xml&id={}",
             EFETCH, &db, id
@@ -125,10 +146,16 @@ pub async fn efetch(
             log::info!("downloaded {} end", pmid);
         } else {
             log::info!("pmid = {} already downloaded", pmid);
+
+            let result = read_target_csv(&path, &mut v);
+            if result.is_err() {
+                log::warn!("pmid = {},  csv parse error = {:?}", pmid, result);
+                let _ = std::fs::remove_file(&path);
+            }
         }
     }
 
-    log::info!("PaperCsvResult len = {}", v.len());
+    log::info!("PaperCsvResult len = {:?}", v);
 
     Ok(())
 }
@@ -154,7 +181,7 @@ fn parse_xml(xml: &str) -> Result<Vec<PaperCsvResult>, Box<dyn std::error::Error
                 .pub_date
                 .year
                 .clone();
-            paper.pubdata_month = f
+            paper.pubdate_month = f
                 .medline_citation
                 .article
                 .journal

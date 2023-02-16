@@ -150,10 +150,13 @@ pub struct ArticleId {
 #[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct PaperCsvResult {
+    #[serde(rename = "PMID")]
     pub pmid: String,
     pub title: String,
+    #[serde(rename = "PubDateYear")]
     pub pubdate_year: String,
-    pub pubdata_month: String,
+    #[serde(rename = "PubDateMonth")]
+    pub pubdate_month: String,
     pub journal_title: String,
     pub journal_abbr: String,
     pub r#abstract: String,
@@ -189,7 +192,7 @@ impl PaperCsvResult {
 
         // 创建文件并写入标题行
         let mut file: File = File::create(file_name)?;
-        writeln!(file, "PMID,Title,PubDateYear,PubDataMonth,JournalTitle,JournalAbbr,Abstract,AuthorFirst,AuthorLast,PublicationType,DOI,ISSN,EPubYear,EPubMonth")?;
+        writeln!(file, "PMID,Title,PubDateYear,PubDateMonth,JournalTitle,JournalAbbr,Abstract,AuthorFirst,AuthorLast,PublicationType,DOI,ISSN,EpubYear,EpubMonth")?;
 
         // 写入数据行
         let row = format!(
@@ -197,7 +200,7 @@ impl PaperCsvResult {
             self.pmid,
             self.title,
             self.pubdate_year,
-            self.pubdata_month,
+            self.pubdate_month,
             self.journal_title,
             self.journal_abbr,
             self.r#abstract,

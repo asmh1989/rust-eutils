@@ -61,14 +61,14 @@ pub struct Journal {
 pub struct JournalIssue {
     pub pub_date: PubDate,
     #[serde(rename = "CitedMedium")]
-    pub cited_medium: String,
+    pub cited_medium: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct PubDate {
     pub year: String,
-    pub month: String,
+    pub month: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -97,10 +97,10 @@ pub struct AuthorList {
 #[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct Author {
-    #[serde(rename = "ValidYN")]
-    pub valid_yn: String,
-    pub last_name: String,
-    pub fore_name: String,
+    // #[serde(rename = "ValidYN")]
+    // pub valid_yn: String,
+    pub last_name: Option<String>,
+    pub fore_name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -113,8 +113,8 @@ pub struct PublicationTypeList {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct PublicationType {
-    #[serde(rename = "UI")]
-    pub ui: String,
+    // #[serde(rename = "UI")]
+    // pub ui: String,
     #[serde(rename = "$value")]
     pub value: String,
 }
@@ -124,7 +124,7 @@ pub struct PublicationType {
 pub struct ArticleDate {
     pub date_type: String,
     pub year: String,
-    pub month: String,
+    pub month: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -203,7 +203,7 @@ impl PaperCsvResult {
             self.pubdate_month,
             self.journal_title,
             self.journal_abbr,
-            self.r#abstract,
+            self.r#abstract.replace("\"", ""),
             self.author_first,
             self.author_last,
             self.publication_type,
@@ -211,7 +211,8 @@ impl PaperCsvResult {
             self.issn,
             self.epub_year,
             self.epub_month,
-        );
+        )
+        .replace("\n", "");
         writeln!(file, "{}", row)?;
 
         Ok(())

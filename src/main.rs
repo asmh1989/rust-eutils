@@ -6,6 +6,8 @@ use response::response_ok;
 use rocket::{fs::NamedFile, get, info, launch, log::LogLevel, response::content, routes};
 use utils::{file_exist, get_pmid_path_by_id};
 
+use crate::response::response_error;
+
 mod config;
 mod eutils;
 mod model;
@@ -16,7 +18,13 @@ mod utils;
 async fn query_pubmed(term: String) -> content::RawJson<String> {
     info!("pubmed query = {:?}", term.as_str());
 
-    response_ok(serde_json::to_value(term).unwrap())
+    let res = crate::eutils::esearch("pubmed", &term).await;
+    if let Ok(r) = res {
+        response_ok(serde_json::to_value(r).unwrap())
+    } else {
+        let err = res.err().unwrap().to_string();
+        response_error(err)
+    }
     // response_error("not found".to_string())
 }
 

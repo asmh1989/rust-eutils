@@ -1,7 +1,4 @@
-use std::{
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use crossbeam_deque::Worker;
 use once_cell::sync::OnceCell;
@@ -10,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     model::{PaperCsvResult, PubmedArticleSet},
-    utils::{file_exist, get_pmid_path_by_id},
+    utils::{file_exist, get_pmid_path_by_id, read_target_csv},
 };
 
 static INSTANCE: OnceCell<Arc<Mutex<Worker<i32>>>> = OnceCell::new();
@@ -63,9 +60,12 @@ fn unlock(id: i32) {
     w.lock().unwrap().push(id);
 }
 
-pub async fn esearch(db: &str, query: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn esearch(
+    db: &str,
+    query: &str,
+) -> Result<Vec<PaperCsvResult>, Box<dyn std::error::Error + Send + Sync>> {
     let mut retstart = 0;
-    let page_size = PAGE_SIZE;
+    let page_size = PAGE_SIZE * 2;
 
     let mut ids: Vec<String> = Vec::new();
 
@@ -102,30 +102,15 @@ pub async fn esearch(db: &str, query: &str) -> Result<(), Box<dyn std::error::Er
 
     log::info!("ids len={},  data = {:?}", ids.len(), ids);
 
-    Ok(())
-}
+    let res = efetch(db, &ids).await?;
 
-fn read_target_csv<P: AsRef<Path>>(
-    path: P,
-    v: &mut Vec<PaperCsvResult>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // let file = File::open(path)?;
-    let mut rdr = csv::ReaderBuilder::new()
-        .delimiter(b',')
-        .has_headers(true)
-        .from_path(path)?;
-    for result in rdr.deserialize() {
-        let ele: PaperCsvResult = result?;
-        v.push(ele);
-    }
-
-    Ok(())
+    Ok(res)
 }
 
 pub async fn efetch(
     db: &str,
     ids: &Vec<String>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<PaperCsvResult>, Box<dyn std::error::Error + Send + Sync>> {
     let mut v: Vec<PaperCsvResult> = Vec::new();
     for id in ids {
         let pmid = id.parse::<usize>()?;
@@ -145,24 +130,43 @@ pub async fn efetch(
             unlock(id);
             log::info!("downloaded {} end", pmid);
         } else {
-            log::info!("pmid = {} already downloaded", pmid);
+            // log::info!("pmid = {} already downloaded", pmid);
 
             let result = read_target_csv(&path, &mut v);
             if result.is_err() {
-                log::warn!("pmid = {},  csv parse error = {:?}", pmid, result);
+                log::warn!("path = {},  csv parse error = {:?}", &path, result);
                 let _ = std::fs::remove_file(&path);
             }
         }
     }
 
-    log::info!("PaperCsvResult len = {:?}", v);
+    log::info!("PaperCsvResult len = {:?}", v.len());
 
-    Ok(())
+    Ok(v)
+}
+
+fn remove_str(input: &str, key: &str) -> String {
+    let re = Regex::new(&format!("<{}.*?>([\\s\\S]*?)</{}>", key, key)).unwrap();
+    let output = re.replace_all(input, |caps: &regex::Captures| {
+        let text = caps.get(1).unwrap().as_str();
+        // log::info!("remove_str({}) = {}", key, text);
+
+        let re_tags = Regex::new(r#"<[^>]+>"#).unwrap();
+        let text = re_tags.replace_all(text, "");
+        format!("<{}>{}</{}>", key, text, key)
+    });
+
+    output.to_string()
 }
 
 fn parse_xml(xml: &str) -> Result<Vec<PaperCsvResult>, Box<dyn std::error::Error + Send + Sync>> {
-    let re = Regex::new(r#"<sup>.*?</sup>"#).unwrap();
-    let text = re.replace_all(xml, "").to_string();
+    let mut text = remove_str(xml, "AbstractText");
+    text = remove_str(&text, "ArticleTitle");
+
+    // log::info!(
+    //     "xml struct = {}",
+    //     serde_json::to_string_pretty(&text).unwrap()
+    // );
 
     let p: PubmedArticleSet = serde_xml_rs::from_str(&text)?;
 
@@ -188,11 +192,12 @@ fn parse_xml(xml: &str) -> Result<Vec<PaperCsvResult>, Box<dyn std::error::Error
                 .journal_issue
                 .pub_date
                 .month
-                .clone();
+                .clone()
+                .unwrap_or("".to_string());
             paper.journal_title = f.medline_citation.article.journal.title.clone();
             paper.journal_abbr = f.medline_citation.article.journal.iso_abbreviation.clone();
             if f.medline_citation.article.r#abstract.is_some() {
-                paper.r#abstract = f
+                let abs = f
                     .medline_citation
                     .article
                     .r#abstract
@@ -202,20 +207,43 @@ fn parse_xml(xml: &str) -> Result<Vec<PaperCsvResult>, Box<dyn std::error::Error
                     .iter()
                     .map(|v| v.value.clone())
                     .collect::<Vec<String>>()
-                    .join(" ");
+                    .join(" ")
+                    .replace("\n", "");
+
+                paper.r#abstract = abs;
             }
             let authors = &f.medline_citation.article.author_list.authors;
             paper.author_first = format!(
                 "{} {}",
-                authors.first().unwrap().fore_name,
-                authors.first().unwrap().last_name
+                authors
+                    .first()
+                    .unwrap()
+                    .fore_name
+                    .clone()
+                    .unwrap_or("".to_string()),
+                authors
+                    .first()
+                    .unwrap()
+                    .last_name
+                    .clone()
+                    .unwrap_or("".to_string())
             );
 
             if authors.len() > 1 {
                 paper.author_last = format!(
                     "{} {}",
-                    authors.last().unwrap().fore_name,
-                    authors.last().unwrap().last_name
+                    authors
+                        .last()
+                        .unwrap()
+                        .fore_name
+                        .clone()
+                        .unwrap_or("".to_string()),
+                    authors
+                        .last()
+                        .unwrap()
+                        .last_name
+                        .clone()
+                        .unwrap_or("".to_string())
                 );
             }
 
@@ -243,13 +271,13 @@ fn parse_xml(xml: &str) -> Result<Vec<PaperCsvResult>, Box<dyn std::error::Error
                 })
                 .collect::<Vec<String>>()
                 .first()
-                .unwrap()
+                .unwrap_or(&format!(""))
                 .to_string();
 
             paper.issn = f.medline_citation.article.journal.issn.clone();
             if let Some(article_date) = f.medline_citation.article.article_date.as_ref() {
                 if &article_date.date_type[..] == "Electronic" {
-                    paper.epub_month = article_date.month.clone();
+                    paper.epub_month = article_date.month.clone().unwrap_or(format!(""));
                     paper.epub_year = article_date.year.clone();
                 }
             }
@@ -266,7 +294,7 @@ fn url_encode(s: &str) -> String {
     let mut result = String::new();
     for ch in s.chars() {
         match ch {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' => {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' | '+' => {
                 result.push(ch);
             }
             ' ' => {
@@ -306,7 +334,7 @@ mod tests {
     async fn test_efetch() {
         crate::config::init_config();
 
-        let ids = vec!["36778985", "36774858"];
+        let ids = vec!["28250621"];
 
         let ii = ids.iter().map(|f| f.to_string()).collect::<Vec<String>>();
         let result = efetch("pubmed", &ii).await;
@@ -318,73 +346,81 @@ mod tests {
     fn test_parse_xml() {
         crate::config::init_config();
         let str = r#"
-        <?xml version="1.0" ?>
-        <!DOCTYPE PubmedArticleSet PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2023//EN" "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_230101.dtd">
         <PubmedArticleSet>
-            <PubmedArticle>
-                <MedlineCitation Status="Publisher" Owner="NLM">
-                    <PMID Version="1">36774858</PMID>
-                    <DateRevised>
-                        <Year>2023</Year>
-                        <Month>02</Month>
-                        <Day>12</Day>
-                    </DateRevised>
-                    <Article PubModel="Print-Electronic">
-                        <Journal>
-                            <ISSN IssnType="Electronic">1878-1705</ISSN>
-                            <JournalIssue CitedMedium="Internet">
-                                <Volume>116</Volume>
-                                <PubDate>
-                                    <Year>2023</Year>
-                                    <Month>Feb</Month>
-                                    <Day>10</Day>
-                                </PubDate>
-                            </JournalIssue>
-                            <Title>International immunopharmacology</Title>
-                            <ISOAbbreviation>Int Immunopharmacol</ISOAbbreviation>
-                        </Journal>
-                        <ArticleTitle>Purine metabolites promote ectopic new bone formation in ankylosing spondylitis.</ArticleTitle>
-                        <Abstract>
-                            <AbstractText>Ankylosing spondylitis (AS) is a chronic inflammatory rheumatic disease that mainly affects the axial skeleton, whose typical features are inflammatory back pain, bone structural damage and pathological new bone formation. The pathology of ectopic new bone formation is still little known. In this study, we found increased purine metabolites in plasma of patients with AS. Similarly, metabolome analysis indicated increased purine metabolites in both serum of CD4-Cre; Ptpn11 and SHP2-deficient chondrocytes. SHP2-deficient chondrocytes promoted the growth of wild type chondrocytes and differentiation of osteoblasts in CD4-Cre; Ptpn11<sup>fl/fl</sup> mice, which spontaneously developed AS-like bone disease. Purine metabolites, along with PTHrP derived from SHP2-deficient chondrocytes, accelerated the growth of chondrocytes and ectopic new bone formation through PKA/CREB signaling. Moreover, Suramin, a purinergic receptor antagonist, suppressed pathological new bone formation in AS-like bone disease. Overall, these results highlight the potential role of targeting purinergic signaling in retarding ectopic new bone formation in AS.</AbstractText>
-                            <CopyrightInformation>Copyright &#xa9; 2023 Elsevier B.V. All rights reserved.</CopyrightInformation>
-                        </Abstract>
-                        <AuthorList CompleteYN="Y">
-                            <Author ValidYN="Y">
-                                <LastName>Zhang</LastName>
-                                <ForeName>Shuqiong</ForeName>
-                                <Initials>S</Initials>
-                                <AffiliationInfo>
-                                    <Affiliation>State Key Laboratory of Pharmaceutical Biotechnology, Department of Biotechnology and Pharmaceutical Sciences, School of Life Sciences, Nanjing University, 163 Xianlin Avenue, Nanjing 210023, China.</Affiliation>
-                                </AffiliationInfo>
-                            </Author>>
-                            <Author ValidYN="Y">
-                                <LastName>Shao</LastName>
-                                <ForeName>Fenli</ForeName>
-                                <Initials>F</Initials>
-                                <AffiliationInfo>
-                                    <Affiliation>State Key Laboratory of Pharmaceutical Biotechnology, Department of Biotechnology and Pharmaceutical Sciences, School of Life Sciences, Nanjing University, 163 Xianlin Avenue, Nanjing 210023, China; College of Pharmacy, Nanjing University of Chinese Medicine, Nanjing 210023, China. Electronic address: shaofenli90@163.com.</Affiliation>
-                                </AffiliationInfo>
-                            </Author>
-                        </AuthorList>
-                        <PublicationTypeList>
-                            <PublicationType UI="D016428">Journal Article</PublicationType>
-                        </PublicationTypeList>
-                        <ArticleDate DateType="Electronic">
+    <PubmedArticle>
+        <MedlineCitation Status="MEDLINE" Owner="NLM" IndexingMethod="Automated">
+            <PMID Version="1">36765305</PMID>
+            <Article PubModel="Electronic">
+                <Journal>
+                    <ISSN IssnType="Electronic">1741-7015</ISSN>
+                    <JournalIssue CitedMedium="Internet">
+                        <PubDate>
                             <Year>2023</Year>
-                            <Month>02</Month>
+                            <Month>Feb</Month>
                             <Day>10</Day>
-                        </ArticleDate>
-                    </Article>
-                </MedlineCitation>
-                <PubmedData>
-                    <ArticleIdList>
-                        <ArticleId IdType="pubmed">36774858</ArticleId>
-                        <ArticleId IdType="doi">10.1016/j.intimp.2023.109810</ArticleId>
-                        <ArticleId IdType="pii">S1567-5769(23)00133-9</ArticleId>
-                    </ArticleIdList>
-                </PubmedData>
-            </PubmedArticle>
-        </PubmedArticleSet>"#;
+                        </PubDate>
+                    </JournalIssue>
+                    <Title>BMC medicine</Title>
+                    <ISOAbbreviation>BMC Med</ISOAbbreviation>
+                </Journal>
+                <ArticleTitle>Dual-specificity phosphatases 22-deficient T cells contribute to the pathogenesis of ankylosing spondylitis.</ArticleTitle>
+                <ELocationID EIdType="pii" ValidYN="Y">46</ELocationID>
+                <ELocationID EIdType="doi" ValidYN="Y">10.1186/s12916-023-02745-6</ELocationID>
+                <Abstract>
+                    <AbstractText Label="BACKGROUND" NlmCategory="BACKGROUND">Dual-specificity phosphatases (DUSPs) can dephosphorylate both tyrosine and serine/threonine residues of their substrates and regulate T cell-mediated immunity and autoimmunity. The aim of this study was to investigate the potential roles of DUSPs in ankylosing spondylitis (AS).</AbstractText>
+                    <AbstractText Label="METHODS" NlmCategory="METHODS">Sixty AS patients and 45 healthy controls were enrolled in this study. Associations of gene expression of 23 DUSPs in peripheral T cells with inflammatory cytokine gene expression and disease activity of AS were analyzed. Finally, we investigated whether the characteristics of AS are developed in DUSP-knockout mice.</AbstractText>
+                    <AbstractText Label="RESULTS" NlmCategory="RESULTS">The mRNA levels of DUSP4, DUSP5, DUSP6, DUSP7, and DUSP14 in peripheral T cells were significantly higher in AS group than those of healthy controls (all p &lt; 0.05), while DUSP22 (also named JKAP) mRNA levels were significantly lower in AS group than healthy controls (p &lt; 0.001). The mRNA levels of DUSP4, DUSP5, DUSP6, DUSP7, and DUSP14 in T cells were positively correlated with mRNA levels of tumor necrosis factor-&#x3b1; (TNF-&#x3b1;), whereas DUSP22 was inversely correlated (all p &lt; 0.05). In addition, inverse correlations of DUSP22 gene expression in peripheral T cells with C-reactive protein, erythrocyte sedimentation rate, and Bath Ankylosing Spondylitis Disease Activity Index (BASDAI) were observed (all p &lt; 0.05). More importantly, aged DUSP22 knockout mice spontaneously developed syndesmophyte formation, which was accompanied by an increase of TNF-&#x3b1;<sup>+</sup>, interleukin-17A<sup>+</sup>, and interferon-&#x3b3;<sup>+</sup> CD3<sup>+</sup> T cells.</AbstractText>
+                    <AbstractText Label="CONCLUSIONS" NlmCategory="CONCLUSIONS">DUSP22 may play a crucial role in the pathogenesis and regulation of disease activity of AS.</AbstractText>
+                    <CopyrightInformation>&#xa9; 2023. The Author(s).</CopyrightInformation>
+                </Abstract>
+                <AuthorList CompleteYN="Y">
+                    <Author ValidYN="Y" EqualContrib="Y">
+                        <LastName>Chen</LastName>
+                        <ForeName>Ming-Han</ForeName>
+                        <Initials>MH</Initials>
+                    </Author>
+                    <Author ValidYN="Y" EqualContrib="Y">
+                        <LastName>Chuang</LastName>
+                        <ForeName>Huai-Chia</ForeName>
+                        <Initials>HC</Initials>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Yeh</LastName>
+                        <ForeName>Yi-Chen</ForeName>
+                        <Initials>YC</Initials>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Chou</LastName>
+                        <ForeName>Chung-Tei</ForeName>
+                        <Initials>CT</Initials>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Tan</LastName>
+                        <ForeName>Tse-Hua</ForeName>
+                        <Initials>TH</Initials>
+                    </Author>
+                </AuthorList>
+                <PublicationTypeList>
+                    <PublicationType UI="D016428">Journal Article</PublicationType>
+                </PublicationTypeList>
+                <ArticleDate DateType="Electronic">
+                    <Year>2023</Year>
+                    <Month>02</Month>
+                    <Day>10</Day>
+                </ArticleDate>
+            </Article>
+            <CitationSubset>IM</CitationSubset>
+        </MedlineCitation>
+        <PubmedData>
+            <ArticleIdList>
+                <ArticleId IdType="pubmed">36765305</ArticleId>
+                <ArticleId IdType="pmc">PMC9921195</ArticleId>
+                <ArticleId IdType="doi">10.1186/s12916-023-02745-6</ArticleId>
+                <ArticleId IdType="pii">10.1186/s12916-023-02745-6</ArticleId>
+            </ArticleIdList>
+        </PubmedData>
+    </PubmedArticle>
+</PubmedArticleSet>"#;
 
         let p = parse_xml(str);
 
@@ -425,5 +461,15 @@ mod tests {
         for task in tasks {
             let _ = task.await;
         }
+    }
+
+    #[test]
+    fn test_regex() {
+        let input = r#"                <Abstract>
+        <AbstractText>The dissemination of methicillin-resistant (MR) <i>Staphylococcus aureus</i> (SA) in community and health-care settings is of great concern and associated with high mortality and morbidity. Rapid detection of MRSA with short turnaround time can minimize the time to initiate appropriate therapy and further promote infection control. Early detection of MRSA directly from clinical samples is complicated by the frequent association of MRSA with methicillin-susceptible SA (MSSA) and coagulase-negative <i>Staphylococcus</i> (CoNS) species. Infection associated with true MRSA or MSSA is differentiated from CoNS, requires target specific primers for the presence of SA and <i>mec</i> A or <i>nuc</i> or <i>fem</i> A gene for confirmation of MR. Recently, livestock-associated MRSA carrying <i>mec</i> C variant complicates the epidemiology of MRSA further. Several commercial rapid molecular kits are available with a different combination of these targets for the detection of MRSA or MSSA. The claimed sensitivity and specificity of the currently available commercial kits is varying, because of the different target combination used for detection of SA and MR.</AbstractText>
+    </Abstract>"#;
+        let output = remove_str(input, "AbstractText");
+
+        println!("{}", output);
     }
 }

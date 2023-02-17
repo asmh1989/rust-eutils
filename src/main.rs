@@ -28,6 +28,21 @@ async fn query_pubmed(term: String) -> content::RawJson<String> {
     // response_error("not found".to_string())
 }
 
+#[get("/pubmed/pmid/<pmid>")]
+async fn get_pubmed_by_id(pmid: String) -> content::RawJson<String> {
+    let res = crate::eutils::efetch("pubmed", &vec![pmid]).await;
+    if let Ok(r) = res {
+        if r.is_empty() {
+            response_error("not found".to_string())
+        } else {
+            response_ok(serde_json::to_value(r.first().unwrap()).unwrap())
+        }
+    } else {
+        let err = res.err().unwrap().to_string();
+        response_error(err)
+    }
+}
+
 #[get("/pubmed/<pmid>")]
 async fn get_pubmed(pmid: String) -> Option<NamedFile> {
     let res = pmid.parse::<usize>();
@@ -59,7 +74,7 @@ async fn rocket() -> _ {
     cfg.port = 4321;
 
     rocket::custom(cfg)
-        .mount("/api", routes![query_pubmed])
+        .mount("/api", routes![query_pubmed, get_pubmed_by_id])
         .mount("/", routes![get_pubmed])
 }
 

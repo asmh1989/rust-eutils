@@ -10,9 +10,11 @@ enum MyHttpReponse {
 }
 
 pub fn response_ok(value: Value) -> content::RawJson<String> {
-    content::RawJson(serde_json::to_string(&MyHttpReponse::Ok(value)).unwrap())
+    content::RawJson(serde_json::to_string_pretty(&MyHttpReponse::Ok(value)).unwrap())
 }
 
 pub fn response_error(msg: String) -> content::RawJson<String> {
-    content::RawJson(serde_json::to_string(&MyHttpReponse::Error(json!({ "msg": msg }))).unwrap())
+    content::RawJson(
+        serde_json::to_string_pretty(&MyHttpReponse::Error(json!({ "msg": msg }))).unwrap(),
+    )
 }

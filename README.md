@@ -61,15 +61,15 @@
 通过`query`查询字符串, 自动查询并解析生成`[pmid]` 列表, 每个`pmid` 即为解析后的内容
 
 `query` 字段的手动获取可以这样
-1.  先在`https://pubmed.ncbi.nlm.nih.gov/advanced/`上组装字符串, 架设得到这个`((target combination[Title/Abstract]) AND (("2019/12/11"[Date - Publication] : "2023/1/1"[Date - Publication]))) AND (Review[Publication Type])`
+1.  先在[https://pubmed.ncbi.nlm.nih.gov/advanced/]上组装字符串, 比如是这样一个查询字符串: `((target combination[Title/Abstract]) AND (("2019/12/11"[Date - Publication] : "2023/1/1"[Date - Publication]))) AND (Review[Publication Type])`
 
-2. 在`pubmed`网页上得到连接`https://pubmed.ncbi.nlm.nih.gov/?term=%28%28target+combination%5BTitle%2FAbstract%5D%29+AND+%28%28%222019%2F12%2F11%22%5BDate+-+Publication%5D+%3A+%222023%2F1%2F1%22%5BDate+-+Publication%5D%29%29%29+AND+%28Review%5BPublication+Type%5D%29&sort=date&size=100`
+2. 在`pubmed`网页上点搜索得到链接[https://pubmed.ncbi.nlm.nih.gov/?term=%28%28target+combination%5BTitle%2FAbstract%5D%29+AND+%28%28%222019%2F12%2F11%22%5BDate+-+Publication%5D+%3A+%222023%2F1%2F1%22%5BDate+-+Publication%5D%29%29%29+AND+%28Review%5BPublication+Type%5D%29&sort=date&size=100]
 
 3. 我们的需要的`query`就是 `term`后面的内容`%28%28target+combination%5BTitle%2FAbstract%5D%29+AND+%28%28%222019%2F12%2F11%22%5BDate+-+Publication%5D+%3A+%222023%2F1%2F1%22%5BDate+-+Publication%5D%29%29%29+AND+%28Review%5BPublication+Type%5D%29`
 
-4. 然后可以在本地这样请求`http://192.168.2.27:4321/api/pubmed/%28%28target+combination%5BTitle%2FAbstract%5D%29+AND+%28%28%222019%2F1%2F1%22%5BDate+-+Publication%5D+%3A+%222023%2F1%2F1%22%5BDate+-+Publication%5D%29%29%29+AND+%28Review%5BPublication+Type%5D%29`即可
+4. 然后可以在本地这样请求[http://192.168.2.27:4321/api/pubmed/%28%28target+combination%5BTitle%2FAbstract%5D%29+AND+%28%28%222019%2F1%2F1%22%5BDate+-+Publication%5D+%3A+%222023%2F1%2F1%22%5BDate+-+Publication%5D%29%29%29+AND+%28Review%5BPublication+Type%5D%29]即可
 
-5. 在用`python`代码时候就是要把``((target combination[Title/Abstract]) AND (("2019/12/11"[Date - Publication] : "2023/1/1"[Date - Publication]))) AND (Review[Publication Type])`
+5. 在用`python`代码时候就是要把`((target combination[Title/Abstract]) AND (("2019/12/11"[Date - Publication] : "2023/1/1"[Date - Publication]))) AND (Review[Publication Type])`
 ` 做个`urlencode` 就可以了
 
 结果如下
@@ -132,7 +132,7 @@
 
 
 #### `/pubmed/<pmid>`
-* `METHOD`: "GET"
+* `method`: "GET"
 
 通过`pmid` 下载对应的`csv`文件
 

@@ -22,7 +22,7 @@
 
 > 有些请求实际上是下载文件, 所以成功就是下载文件, 错误就是 `404`
 
-#### `/api/pubmed/<pmid>`
+#### `/api/pubmed/pmid/<pmid>`
 * `method`: `GET`
 
 通过`pmid`请求对应的`json`格式内容

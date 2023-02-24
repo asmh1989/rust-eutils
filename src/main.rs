@@ -14,8 +14,26 @@ mod model;
 mod response;
 mod utils;
 
-#[get("/pubmed/<term>")]
-async fn query_pubmed(term: String) -> content::RawJson<String> {
+#[get("/pubmed/<term>?<cur_page>&<page_size>")]
+async fn query_pubmed(
+    term: String,
+    cur_page: Option<usize>,
+    page_size: Option<usize>,
+) -> content::RawJson<String> {
+    info!("pubmed query = {:?}", term.as_str());
+
+    let res = crate::eutils::esearch2("pubmed", &term, cur_page, page_size).await;
+    if let Ok(r) = res {
+        response_ok(serde_json::to_value(r).unwrap())
+    } else {
+        let err = res.err().unwrap().to_string();
+        response_error(err)
+    }
+    // response_error("not found".to_string())
+}
+
+#[get("/pubmed/total/<term>")]
+async fn query_pubmed_total(term: String) -> content::RawJson<String> {
     info!("pubmed query = {:?}", term.as_str());
 
     let res = crate::eutils::esearch("pubmed", &term).await;
@@ -74,7 +92,10 @@ async fn rocket() -> _ {
     cfg.port = 4321;
 
     rocket::custom(cfg)
-        .mount("/api", routes![query_pubmed, get_pubmed_by_id])
+        .mount(
+            "/api",
+            routes![query_pubmed, get_pubmed_by_id, query_pubmed_total],
+        )
         .mount("/", routes![get_pubmed])
 }
 

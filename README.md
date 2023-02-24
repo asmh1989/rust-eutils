@@ -55,10 +55,12 @@
 ```
 
 
-#### `/api/pubmed/<query>`
+#### `/api/pubmed/total/<query>`
 * `method`: `GET`
 
 通过`query`查询字符串, 自动查询并解析生成`[pmid]` 列表, 每个`pmid` 即为解析后的内容
+
+> 该接口返回所有查询到的数据, 所以请求会比较慢, 如果需要分页,或者获取查询到的总数, 请用下面的接口`/api/pubmed/<query>?<cur_page>&<page_size>`
 
 `query` 字段的手动获取可以这样
 1.  先在 https://pubmed.ncbi.nlm.nih.gov/advanced/ 上组装字符串, 比如是这样一个查询字符串: `((target combination[Title/Abstract]) AND (("2019/12/11"[Date - Publication] : "2023/1/1"[Date - Publication]))) AND (Review[Publication Type])`
@@ -93,46 +95,61 @@
       "PublicationType": "Journal Article | Review",
       "Title": "Glioblastoma and the search for non-hypothesis driven combination therapeutics in academia."
     },
-    {
-      "Abstract": "Catastrophic antiphospholipid syndrome (CAPS) is a rare condition characterized by multiple thromboses affecting mainly small vessels in a short period of time in patients with antiphospholipid antibodies. A high suspicion index is mandatory in order to initiate rapidly aggressive immunomodulatory therapy to avoid a very poor prognosis. Systemic lupus erythematosus (SLE) is often associated with antiphospholipid syndrome, with a worse outcome when the catastrophic features occur. We report the case of a 64-year-old woman with a clinical debut of SLE who presented concomitantly with CAPS with several thrombosis affecting the kidney, spleen and bilateral limbs with blue toe syndrome in both legs. Furthermore, she presented with aortitis, with a malaise and myalgias and general syndrome (asthenia, hyporexia and mild weight loss). Fortunately, she had a good response to multi-target combination therapy (anticoagulants, corticosteroids, hydroxychloroquine, intravenous immunoglobulins, plasma exchange and rituximab). Here, we discuss the association between aortitis and CAPS secondary to SLE, and review the literature regarding similar conditions.",
-      "AuthorFirst": "Andrés González-García",
-      "AuthorLast": "Luis Manzano",
-      "DOI": "10.1177/0961203320931173",
-      "EpubMonth": "06",
-      "EpubYear": "2020",
-      "ISSN": "1477-0962",
-      "JournalAbbr": "Lupus",
-      "JournalTitle": "Lupus",
-      "PMID": "32517572",
-      "PubDateMonth": "Aug",
-      "PubDateYear": "2020",
-      "PublicationType": "Case Reports | Journal Article | Review",
-      "Title": "Aortitis in the setting of catastrophic antiphospholipid syndrome in a patient with systemic lupus erythematosus."
-    },
-    {
-      "Abstract": "Open access to 3D structure information from the Protein Data Bank (PDB) facilitated discovery and development of >90% of the 79 new antineoplastic agents (54 small molecules, 25 biologics) with known molecular targets approved by the FDA 2010-2018. Analyses of PDB holdings, the scientific literature and related documents for each drug-target combination revealed that the impact of public-domain 3D structure data was broad and substantial, ranging from understanding target biology (∼95% of all targets) to identifying a given target as probably druggable (∼95% of all targets) to structure-guided lead optimization (>70% of all small-molecule drugs). In addition to aggregate impact assessments, illustrative case studies are presented for three protein kinase inhibitors, an allosteric enzyme inhibitor and seven advanced-stage melanoma therapeutics.",
-      "AuthorFirst": "John D Westbrook",
-      "AuthorLast": "Stephen K Burley",
-      "DOI": "10.1016/j.drudis.2020.02.002",
-      "EpubMonth": "02",
-      "EpubYear": "2020",
-      "ISSN": "1878-5832",
-      "JournalAbbr": "Drug Discov Today",
-      "JournalTitle": "Drug discovery today",
-      "PMID": "32068073",
-      "PubDateMonth": "May",
-      "PubDateYear": "2020",
-      "PublicationType": "Journal Article | Research Support, N.I.H., Extramural | Research Support, U.S. Gov't, Non-P.H.S. | Review",
-      "Title": "Impact of the Protein Data Bank on antineoplastic approvals."
-    }
+...
   ]
 }
 
 ```
 
 
+#### `/api/pubmed/<query>?<cur_page>&<page_size>`
+* `method`: `GET`
+
+分页接口查询, `<query>`的参数设置和上面的`../total/..`接口一直, 区别是加入下面两个参数
+  * `cur_page`:  当前页设置, 默认为0   // 0: 表示第一页
+  * `page_size`:  每页数量设置, 默认为10
+
+例子
+
+```
+/api/pubmed/<query>?cur_page=2       # 获取第三页数据, 默认每页10, 也就是获取第 20-30的结果
+
+```
+
+返回:  http://192.168.2.27:4321/api/pubmed/%28%28target+combination%5BTitle%2FAbstract%5D%29+AND+%28%28%222018%2F12%2F1%22%5BDate+-+Publication%5D+%3A+%222023%2F1%2F1%22%5BDate+-+Publication%5D%29%29%29+AND+%28Review%5BPublication+Type%5D%29?cur_page=2&page_size=1 
+
+``` json
+{
+  "ok": {
+    "count": 8,                                    # 该请求总共数据8个
+    "cur_page": 2,                                 #  返回第三页 
+    "data": [
+      {
+        "Abstract": "Open access to 3D structure information from the Protein Data Bank (PDB) facilitated discovery and development of >90% of the 79 new antineoplastic agents (54 small molecules, 25 biologics) with known molecular targets approved by the FDA 2010-2018. Analyses of PDB holdings, the scientific literature and related documents for each drug-target combination revealed that the impact of public-domain 3D structure data was broad and substantial, ranging from understanding target biology (∼95% of all targets) to identifying a given target as probably druggable (∼95% of all targets) to structure-guided lead optimization (>70% of all small-molecule drugs). In addition to aggregate impact assessments, illustrative case studies are presented for three protein kinase inhibitors, an allosteric enzyme inhibitor and seven advanced-stage melanoma therapeutics.",
+        "AuthorFirst": "John D Westbrook",
+        "AuthorLast": "Stephen K Burley",
+        "DOI": "10.1016/j.drudis.2020.02.002",
+        "EpubMonth": "02",
+        "EpubYear": "2020",
+        "ISSN": "1878-5832",
+        "JournalAbbr": "Drug Discov Today",
+        "JournalTitle": "Drug discovery today",
+        "PMID": "32068073",
+        "PubDateMonth": "May",
+        "PubDateYear": "2020",
+        "PublicationType": "Journal Article | Research Support, N.I.H., Extramural | Research Support, U.S. Gov't, Non-P.H.S. | Review",
+        "Title": "Impact of the Protein Data Bank on antineoplastic approvals."
+      }
+    ],
+    "page_size": 1,                                # 每页大小1
+    "query_text": "((target+combination[Title/Abstract])+AND+((\"2018/12/1\"[Date+-+Publication]+:+\"2023/1/1\"[Date+-+Publication])))+AND+(Review[Publication+Type])"
+  }
+}
+```
+
+
 #### `/pubmed/<pmid>`
-* `method`: "GET"
+* `method`: `GET`
 
 通过`pmid` 下载对应的`csv`文件
 

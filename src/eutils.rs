@@ -1,14 +1,13 @@
 use std::sync::{Arc, Mutex};
 
-use crossbeam_deque::Worker;
-use once_cell::sync::OnceCell;
-use regex::Regex;
-use serde::{Deserialize, Serialize};
-
 use crate::{
     model::{PaperCsvResult, PubmedArticleSet},
     utils::{file_exist, get_pmid_path_by_id, read_target_csv},
 };
+use crossbeam_deque::Worker;
+use once_cell::sync::OnceCell;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 static INSTANCE: OnceCell<Arc<Mutex<Worker<i32>>>> = OnceCell::new();
 // static CPU_LOCK: OnceCell<Arc<Mutex<usize>>> = OnceCell::new();
@@ -58,6 +57,46 @@ async fn lock() -> i32 {
 fn unlock(id: i32) {
     let w = INSTANCE.get().expect("work need init first");
     w.lock().unwrap().push(id);
+}
+
+pub async fn esearch2(
+    db: &str,
+    query: &str,
+    page: Option<usize>,
+    page_size: Option<usize>,
+) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+    let retstart = page.unwrap_or(0);
+    let page_size = page_size.unwrap_or(10);
+
+    let mut ids: Vec<String> = Vec::new();
+
+    let url = format!(
+            "{}db={}&term={}&retmode=json&api_key=f6bc4f0e30a718d326ef842054d988ecdd08&retstart={}&retmax={}",
+            ESEARCH,
+            &db,
+            &url_encode(&query),
+            retstart,
+            page_size
+        );
+
+    let id = lock().await;
+    log::info!("request_task_id = {},  esearch, url = {}", id, &url);
+    let resp = reqwest::get(&url).await?.json::<SearchResult>().await?;
+    unlock(id);
+
+    ids.extend(resp.esearchresult.idlist.iter().cloned());
+
+    log::info!("ids len={},  data = {:?}", ids.len(), ids);
+
+    let res = efetch(db, &ids).await?;
+
+    Ok(serde_json::json!({
+        "count": resp.esearchresult.count.parse::<i32>().unwrap_or(-1),
+        "data": res,
+        "cur_page": retstart,
+        "page_size": page_size,
+        "query_text": query
+    }))
 }
 
 pub async fn esearch(
@@ -326,6 +365,17 @@ mod tests {
         let s = "(Ankylosing spondylitis[Title/Abstract]) AND (\"2023/1/10\"[Date - Publication] : \"2023/2/10\"[Date - Publication])";
 
         let result = esearch("pubmed", s).await;
+
+        log::info!("result = {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_esearch2() {
+        crate::config::init_config();
+
+        let s = "(Ankylosing spondylitis[Title/Abstract]) AND (\"2023/1/10\"[Date - Publication] : \"2023/2/10\"[Date - Publication])";
+
+        let result = esearch2("pubmed", s, Some(2), Some(1)).await;
 
         log::info!("result = {:?}", result);
     }

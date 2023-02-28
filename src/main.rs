@@ -5,7 +5,7 @@ use std::net::Ipv4Addr;
 use response::response_ok;
 use rocket::{
     fairing::{Fairing, Info, Kind},
-    fs::NamedFile,
+    fs::{relative, NamedFile},
     get,
     http::Header,
     info, launch,
@@ -105,6 +105,10 @@ async fn rocket() -> _ {
         .mount(
             "/api",
             routes![query_pubmed, get_pubmed_by_id, query_pubmed_total],
+        )
+        .mount(
+            "/",
+            rocket::fs::FileServer::from(relative!("../vue-eutils/dist")),
         )
         .mount("/", routes![get_pubmed])
 }

@@ -29,7 +29,7 @@ struct ESearchResult {
     retmax: String,
     retstart: String,
     idlist: Vec<String>,
-    translationset: Vec<String>,
+    // translationset: Vec<String>,
     querytranslation: String,
 }
 
@@ -95,7 +95,7 @@ pub async fn esearch2(
         "data": res,
         "cur_page": retstart,
         "page_size": page_size,
-        "query_text": query
+        "query_text": resp.esearchresult.querytranslation
     }))
 }
 
@@ -211,6 +211,7 @@ fn parse_xml(xml: &str) -> Result<Vec<PaperCsvResult>, Box<dyn std::error::Error
 
     let res = p
         .pubmed_article
+        .unwrap_or(vec![])
         .iter()
         .map(|f| {
             let mut paper = PaperCsvResult::default();
@@ -313,7 +314,13 @@ fn parse_xml(xml: &str) -> Result<Vec<PaperCsvResult>, Box<dyn std::error::Error
                 .unwrap_or(&format!(""))
                 .to_string();
 
-            paper.issn = f.medline_citation.article.journal.issn.clone();
+            paper.issn = f
+                .medline_citation
+                .article
+                .journal
+                .issn
+                .clone()
+                .unwrap_or("".to_string());
             if let Some(article_date) = f.medline_citation.article.article_date.as_ref() {
                 if &article_date.date_type[..] == "Electronic" {
                     paper.epub_month = article_date.month.clone().unwrap_or(format!(""));

@@ -7,7 +7,7 @@ use crate::utils::{file_exist, get_pmid_path_by_id};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct PubmedArticleSet {
-    pub pubmed_article: Vec<PubmedArticle>,
+    pub pubmed_article: Option<Vec<PubmedArticle>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -49,7 +49,7 @@ pub struct Article {
 #[serde(rename_all = "PascalCase")]
 pub struct Journal {
     #[serde(rename = "ISSN")]
-    pub issn: String,
+    pub issn: Option<String>,
     pub journal_issue: JournalIssue,
     pub title: String,
     #[serde(rename = "ISOAbbreviation")]

@@ -69,20 +69,7 @@ pub async fn esearch2(
     let page_size = page_size.unwrap_or(10);
 
     let mut ids: Vec<String> = Vec::new();
-
-    let url = format!(
-            "{}db={}&term={}&retmode=json&api_key=f6bc4f0e30a718d326ef842054d988ecdd08&retstart={}&retmax={}",
-            ESEARCH,
-            &db,
-            &url_encode(&query),
-            retstart,
-            page_size
-        );
-
-    let id = lock().await;
-    log::info!("request_task_id = {},  esearch, url = {}", id, &url);
-    let resp = reqwest::get(&url).await?.json::<SearchResult>().await?;
-    unlock(id);
+    let resp = fetch_ids(db, query, retstart, page_size).await?;
 
     ids.extend(resp.esearchresult.idlist.iter().cloned());
 
@@ -99,6 +86,49 @@ pub async fn esearch2(
     }))
 }
 
+async fn fetch_ids(
+    db: &str,
+    query: &str,
+    retstart: usize,
+    page_size: usize,
+) -> Result<SearchResult, Box<dyn std::error::Error + Send + Sync>> {
+    let url = format!(
+            "{}db={}&term={}&retmode=json&api_key=f6bc4f0e30a718d326ef842054d988ecdd08&retstart={}&retmax={}",
+            ESEARCH,
+            &db,
+            &url_encode(&query),
+            retstart,
+            page_size
+        );
+
+    let id = lock().await;
+    log::info!("request_task_id = {},  esearch, url = {}", id, &url);
+    let resp = reqwest::get(&url).await?.json::<SearchResult>().await?;
+    unlock(id);
+
+    Ok(resp)
+}
+
+pub async fn esearch3(
+    db: &str,
+    query: &str,
+    page: Option<usize>,
+    page_size: Option<usize>,
+) -> Result<Vec<PaperCsvResult>, Box<dyn std::error::Error + Send + Sync>> {
+    let retstart = page.unwrap_or(0);
+    let page_size = page_size.unwrap_or(10);
+
+    let mut ids: Vec<String> = Vec::new();
+    let resp = fetch_ids(db, query, retstart, page_size).await?;
+    ids.extend(resp.esearchresult.idlist.iter().cloned());
+
+    log::info!("ids len={},  data = {:?}", ids.len(), ids);
+
+    let res = efetch(db, &ids).await?;
+
+    Ok(res)
+}
+
 pub async fn esearch(
     db: &str,
     query: &str,
@@ -109,20 +139,7 @@ pub async fn esearch(
     let mut ids: Vec<String> = Vec::new();
 
     loop {
-        let url = format!(
-            "{}db={}&term={}&retmode=json&api_key=f6bc4f0e30a718d326ef842054d988ecdd08&retstart={}&retmax={}",
-            ESEARCH,
-            &db,
-            &url_encode(&query),
-            retstart,
-            page_size
-        );
-
-        let id = lock().await;
-        log::info!("request_task_id = {},  esearch, url = {}", id, &url);
-        let resp = reqwest::get(&url).await?.json::<SearchResult>().await?;
-        unlock(id);
-
+        let resp = fetch_ids(db, query, retstart, page_size).await?;
         ids.extend(resp.esearchresult.idlist.iter().cloned());
         // log::info!("{:#?}", resp);
 

@@ -1,5 +1,7 @@
 use std::{fs, os::unix::prelude::MetadataExt, path::Path};
 
+use chrono::Datelike;
+
 use crate::model::PaperCsvResult;
 
 pub fn get_pmid_path_by_id(id: usize) -> String {
@@ -16,6 +18,22 @@ pub fn get_pmid_path_by_id(id: usize) -> String {
         (second + 1) * thousand,
         id
     );
+}
+
+pub fn get_download_path_by_time(file_type: &str, id: i64) -> String {
+    let date = chrono::NaiveDateTime::from_timestamp_millis(id);
+    if let Some(d) = date {
+        let year = d.year();
+        let month = d.month();
+        let day = d.day();
+
+        return format!(
+            "data/download_{}/{}-{}-{}/{}.{}",
+            file_type, year, month, day, id, file_type
+        );
+    } else {
+        return format!("not_found");
+    }
 }
 
 pub fn file_exist(path: &str) -> bool {

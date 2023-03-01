@@ -13,7 +13,7 @@ use rocket::{
     response::content,
     routes, Request, Response,
 };
-use utils::{file_exist, get_pmid_path_by_id};
+use utils::{file_exist, get_download_path_by_time, get_pmid_path_by_id};
 
 use crate::response::response_error;
 
@@ -34,6 +34,33 @@ async fn query_pubmed(
     let res = crate::eutils::esearch2("pubmed", &term, cur_page, page_size).await;
     if let Ok(r) = res {
         response_ok(serde_json::to_value(r).unwrap())
+    } else {
+        let err = res.err().unwrap().to_string();
+        response_error(err)
+    }
+    // response_error("not found".to_string())
+}
+
+/// 下载
+#[get("/pubmed/save/<term>?<cur_page>&<page_size>&<file_type>")]
+async fn query_pubmed_and_save(
+    term: String,
+    cur_page: Option<usize>,
+    page_size: Option<usize>,
+    file_type: Option<String>,
+) -> content::RawJson<String> {
+    info!(
+        "pubmed query = {:?}, file_type = {:?}",
+        term.as_str(),
+        &file_type
+    );
+
+    let res = crate::eutils::esearch3("pubmed", &term, cur_page, page_size).await;
+    if let Ok(r) = res {
+        match model::PaperCsvResult::save_list_csv(&r) {
+            Ok(rr) => response_ok(serde_json::to_value(rr).unwrap()),
+            Err(err) => response_error(err.to_string()),
+        }
     } else {
         let err = res.err().unwrap().to_string();
         response_error(err)
@@ -91,6 +118,16 @@ async fn get_pubmed(pmid: String) -> Option<NamedFile> {
     }
 }
 
+#[get("/<file_type>/<id>")]
+async fn download(file_type: String, id: i64) -> Option<NamedFile> {
+    let path = get_download_path_by_time(&file_type, id);
+    if file_exist(&path) {
+        NamedFile::open(&path).await.ok()
+    } else {
+        None
+    }
+}
+
 #[launch]
 async fn rocket() -> _ {
     crate::config::init_config();
@@ -104,13 +141,19 @@ async fn rocket() -> _ {
         .attach(Cors) // cors
         .mount(
             "/api",
-            routes![query_pubmed, get_pubmed_by_id, query_pubmed_total],
+            routes![
+                query_pubmed,
+                get_pubmed_by_id,
+                query_pubmed_total,
+                query_pubmed_and_save
+            ],
         )
         .mount(
             "/",
             rocket::fs::FileServer::from(relative!("../vue-eutils/dist")),
         )
         .mount("/", routes![get_pubmed])
+        .mount("/download", routes![download])
 }
 
 pub struct Cors;

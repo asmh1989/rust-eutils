@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::{fs::File, io};
 
-use crate::utils::{file_exist, get_pmid_path_by_id};
+use crate::utils::{file_exist, get_download_path_by_time, get_pmid_path_by_id};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -172,6 +172,30 @@ pub struct PaperCsvResult {
 }
 
 impl PaperCsvResult {
+    fn get_row_str(&self) -> String {
+        return format!(
+            "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}",
+            self.pmid,
+            self.title,
+            self.pubdate_year,
+            self.pubdate_month,
+            self.journal_title,
+            self.journal_abbr,
+            self.r#abstract.replace("\"", ""),
+            self.author_first,
+            self.author_last,
+            self.publication_type,
+            self.doi,
+            self.issn,
+            self.epub_year,
+            self.epub_month,
+        )
+        .replace("\n", "");
+    }
+
+    fn get_csv_header() -> String {
+        format!("PMID,Title,PubDateYear,PubDateMonth,JournalTitle,JournalAbbr,Abstract,AuthorFirst,AuthorLast,PublicationType,DOI,ISSN,EpubYear,EpubMonth")
+    }
     // 保存到 CSV 文件
     pub fn save_csv(&self) -> io::Result<()> {
         if self.pmid.is_empty() {
@@ -192,29 +216,35 @@ impl PaperCsvResult {
 
         // 创建文件并写入标题行
         let mut file: File = File::create(file_name)?;
-        writeln!(file, "PMID,Title,PubDateYear,PubDateMonth,JournalTitle,JournalAbbr,Abstract,AuthorFirst,AuthorLast,PublicationType,DOI,ISSN,EpubYear,EpubMonth")?;
+        writeln!(file, "{}", Self::get_csv_header())?;
 
         // 写入数据行
-        let row = format!(
-            "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}",
-            self.pmid,
-            self.title,
-            self.pubdate_year,
-            self.pubdate_month,
-            self.journal_title,
-            self.journal_abbr,
-            self.r#abstract.replace("\"", ""),
-            self.author_first,
-            self.author_last,
-            self.publication_type,
-            self.doi,
-            self.issn,
-            self.epub_year,
-            self.epub_month,
-        )
-        .replace("\n", "");
+        let row = self.get_row_str();
         writeln!(file, "{}", row)?;
 
         Ok(())
+    }
+
+    pub fn save_list_csv(list: &Vec<PaperCsvResult>) -> io::Result<serde_json::Value> {
+        let now = chrono::Utc::now().timestamp_millis();
+        let file_name = get_download_path_by_time("csv", now);
+
+        let path = std::path::Path::new(&file_name);
+        let prefix = path.parent().unwrap();
+        std::fs::create_dir_all(prefix)?;
+
+        // 创建文件并写入标题行
+        let mut file: File = File::create(file_name)?;
+
+        let header = Self::get_csv_header();
+        let content = list
+            .iter()
+            .map(|f| f.get_row_str())
+            .collect::<Vec<String>>();
+        let c = format!("{}\n{}", header.as_str(), content.join("\n").as_str());
+
+        writeln!(file, "{}", c)?;
+
+        Ok(serde_json::json!({ "id": now }))
     }
 }

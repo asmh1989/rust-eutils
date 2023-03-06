@@ -92,12 +92,18 @@ async fn fetch_ids(
     retstart: usize,
     page_size: usize,
 ) -> Result<SearchResult, Box<dyn std::error::Error + Send + Sync>> {
+    let start = if retstart == 0 {
+        retstart
+    } else {
+        retstart * page_size
+    };
+
     let url = format!(
             "{}db={}&term={}&retmode=json&api_key=f6bc4f0e30a718d326ef842054d988ecdd08&retstart={}&retmax={}",
             ESEARCH,
             &db,
             &url_encode(&query),
-            retstart,
+            start,
             page_size
         );
 

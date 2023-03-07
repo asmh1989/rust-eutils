@@ -1,11 +1,8 @@
 #![allow(dead_code)]
 
 use rocket::form::Form;
-use rocket::form::FromForm;
 use rocket::post;
 use std::net::Ipv4Addr;
-
-use rocket::serde::json::Json;
 
 use response::response_ok;
 use rocket::{
@@ -135,23 +132,9 @@ async fn download(file_type: String, id: i64) -> Option<NamedFile> {
     }
 }
 
-#[post("/openai/chat", format = "json", data = "<req>")]
-async fn openai_chat(req: Json<ChatRequest<'_>>) -> content::RawJson<String> {
-    log::info!(" start openai_chat .. ");
-    let res =
-        crate::openai::openai_nlp(req.content.to_owned(), req.max_tokens, req.temperature).await;
-
-    if let Ok(r) = res {
-        response_ok(serde_json::to_value(r).unwrap())
-    } else {
-        let err = res.err().unwrap().to_string();
-        response_error(err)
-    }
-}
-
 #[post("/openai/chat2", data = "<req>")]
 async fn openai_chat_form(req: Form<ChatRequest<'_>>) -> content::RawJson<String> {
-    log::info!(" start openai_chat .. {:?}", &req);
+    log::info!("start openai_chat .. {:?}", &req);
     let res =
         crate::openai::openai_nlp(req.content.to_owned(), req.max_tokens, req.temperature).await;
 
@@ -182,7 +165,7 @@ async fn rocket() -> _ {
                 query_pubmed_total,
                 query_pubmed_and_save,
                 openai_chat_form,
-                openai_chat
+                crate::openai::openai_chat
             ],
         )
         .mount(

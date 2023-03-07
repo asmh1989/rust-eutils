@@ -1,7 +1,10 @@
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION};
-use rocket::form::FromForm;
+use rocket::{form::FromForm, post, response::content};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+
+use crate::response::{response_error, response_ok};
+use rocket::serde::json::Json;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
@@ -95,6 +98,20 @@ pub async fn openai_nlp(
     );
 
     Ok(msg.to_owned())
+}
+
+#[post("/openai/chat", format = "json", data = "<req>")]
+pub async fn openai_chat(req: Json<ChatRequest<'_>>) -> content::RawJson<String> {
+    log::info!("start openai_chat .. ");
+    let res =
+        crate::openai::openai_nlp(req.content.to_owned(), req.max_tokens, req.temperature).await;
+
+    if let Ok(r) = res {
+        response_ok(serde_json::to_value(r).unwrap())
+    } else {
+        let err = res.err().unwrap().to_string();
+        response_error(err)
+    }
 }
 
 #[cfg(test)]

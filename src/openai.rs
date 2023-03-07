@@ -80,7 +80,9 @@ pub async fn openai_nlp(
         HeaderValue::from_str(&format!("Bearer {}", api_key))?,
     );
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .proxy(reqwest::Proxy::https("http://192.168.2.25:7890")?)
+        .build()?;
     let response = client
         .post(url)
         .headers(headers)

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
-use rocket::form::{Form, FromForm};
+use rocket::form::Form;
+use rocket::form::FromForm;
 use rocket::post;
 use std::net::Ipv4Addr;
 

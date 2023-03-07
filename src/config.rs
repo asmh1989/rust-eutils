@@ -27,7 +27,7 @@ fn init_log() {
         .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
         .build(format!(
             "log/log_{}.log",
-            chrono::Utc::now().timestamp_millis()
+            chrono::Utc::now().format("%y-%m-%d")
         ))
         .unwrap();
 

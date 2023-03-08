@@ -146,7 +146,42 @@
   }
 }
 ```
+#### `/api/openai/chat`
+* `method` : `GET`
 
+基于`gpt-3.5-turbo`模型的`openai`返回, 一问一答方式, 参数支持
+```json
+{
+    "content": "",      // 问题内容
+    "max_tokens": 4096, // 一问一答最大支持tokens数, 默认4096, 不是必须 
+    "temperature": 0.2, // 问题准确性, 默认0.2, 取值0-2 之间, 不是必须 <https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature>
+}
+
+# curl 模拟
+curl -X POST -H "Content-Type: application/json" -d '{"content":"Hello"}' http://192.168.2.27:4321/api/openai/chat
+```
+
+#### `/api/openai/summary`
+* `method`: `POST`
+* `form-data` 提交
+
+在上面`chat`的基础上, 批量进行问题并返回结果
+参数
+```json
+{
+  "question":"what is the relation between FXR and NLRP3",
+  "file": "local file path"
+}
+```
+
+主要针对上传的`file`(必须上web上下载的csv文件, 格式要一致, 且包含`Abstract`)
+curl 模拟
+
+```bash
+
+# -o 保存到本地文件
+curl -X POST -H "Content-Type: multipart/form-data" -F "file=@data/paper.csv" -F "question=what is the relation between FXR and NLRP3" http://192.168.2.27:4321/api//openai/summary -o 123.csv 
+```
 
 #### `/pubmed/<pmid>`
 * `method`: `GET`
@@ -158,3 +193,4 @@
 请求:
     http://192.168.2.27:4321/pubmed/28250621
 ```
+

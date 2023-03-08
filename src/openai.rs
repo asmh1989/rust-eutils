@@ -196,7 +196,10 @@ async fn chat_abstract_summary<P: AsRef<Path>>(
     let mut rr = Vec::with_capacity(v.len());
 
     for f in v {
-        let content = format!("Answer me {} in one sentence after reading the following paragraph. Here is the paragraph: {}", question, &f.r#abstract);
+        let content = format!(
+            "Answer me {} in one sentence after reading the following paragraph: {}",
+            question, &f.r#abstract
+        );
         let csv = f;
 
         let summary = loop {

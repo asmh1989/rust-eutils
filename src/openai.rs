@@ -61,7 +61,7 @@ pub struct ChatRequest {
     pub temperature: Option<f64>,
 }
 
-const DEALY_TIME: u64 = 4;
+const DEALY_TIME: u64 = 8;
 const USE_CHATGPT_API: bool = true;
 #[async_recursion]
 pub async fn openai_nlp(

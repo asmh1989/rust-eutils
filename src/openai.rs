@@ -53,12 +53,13 @@ pub struct CompletionResponse {
 }
 
 #[derive(FromForm, Debug, Serialize, Deserialize)]
-pub struct ChatRequest<'r> {
-    pub content: &'r str,
+pub struct ChatRequest {
+    pub content: String,
     pub max_tokens: Option<u64>,
     pub temperature: Option<f64>,
 }
 
+const DEALY_TIME: u64 = 4;
 #[async_recursion]
 pub async fn openai_nlp(
     content: String,
@@ -121,7 +122,7 @@ pub async fn openai_nlp(
         }
         Err(err) => {
             log::info!("res = {}, err = {:?}", &text, err);
-            sleep(Duration::from_secs(3)).await;
+            sleep(Duration::from_secs(DEALY_TIME)).await;
 
             openai_nlp(content, tokens, temp).await
         }
@@ -155,7 +156,7 @@ pub async fn openai_chat_summary_file(req: Form<Upload<'_>>) -> Option<NamedFile
 }
 
 #[post("/openai/chat", format = "json", data = "<req>")]
-pub async fn openai_chat(req: Json<ChatRequest<'_>>) -> content::RawJson<String> {
+pub async fn openai_chat(req: Json<ChatRequest>) -> content::RawJson<String> {
     let res =
         crate::openai::openai_nlp(req.content.to_owned(), req.max_tokens, req.temperature).await;
 
@@ -209,7 +210,7 @@ async fn chat_abstract_summary<P: AsRef<Path>>(
                 }
             }
 
-            sleep(Duration::from_secs(3)).await;
+            sleep(Duration::from_secs(DEALY_TIME)).await;
         };
 
         rr.push(csv.to_summary(summary));

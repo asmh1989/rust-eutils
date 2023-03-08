@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use rocket::form::Form;
-use rocket::post;
 use std::net::Ipv4Addr;
 
 use response::response_ok;
@@ -17,7 +15,6 @@ use rocket::{
 };
 use utils::{file_exist, get_download_path_by_time, get_pmid_path_by_id};
 
-use crate::openai::ChatRequest;
 use crate::response::response_error;
 
 mod config;
@@ -132,19 +129,19 @@ async fn download(file_type: String, id: i64) -> Option<NamedFile> {
     }
 }
 
-#[post("/openai/chat2", data = "<req>")]
-async fn openai_chat_form(req: Form<ChatRequest<'_>>) -> content::RawJson<String> {
-    log::info!("start openai_chat .. {:?}", &req);
-    let res =
-        crate::openai::openai_nlp(req.content.to_owned(), req.max_tokens, req.temperature).await;
+// #[post("/openai/chat2", data = "<req>")]
+// async fn openai_chat_form(req: Form<ChatRequest<'_>>) -> content::RawJson<String> {
+//     log::info!("start openai_chat .. {:?}", &req);
+//     let res =
+//         crate::openai::openai_nlp(req.content.to_owned(), req.max_tokens, req.temperature).await;
 
-    if let Ok(r) = res {
-        response_ok(serde_json::to_value(r).unwrap())
-    } else {
-        let err = res.err().unwrap().to_string();
-        response_error(err)
-    }
-}
+//     if let Ok(r) = res {
+//         response_ok(serde_json::to_value(r).unwrap())
+//     } else {
+//         let err = res.err().unwrap().to_string();
+//         response_error(err)
+//     }
+// }
 
 #[launch]
 async fn rocket() -> _ {
@@ -164,7 +161,7 @@ async fn rocket() -> _ {
                 get_pubmed_by_id,
                 query_pubmed_total,
                 query_pubmed_and_save,
-                openai_chat_form,
+                // openai_chat_form,
                 crate::openai::openai_chat,
                 crate::openai::openai_chat_summary_file
             ],

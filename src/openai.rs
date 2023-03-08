@@ -121,7 +121,7 @@ pub async fn openai_nlp(
         }
         Err(err) => {
             log::info!("res = {}, err = {:?}", &text, err);
-            sleep(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(3)).await;
 
             openai_nlp(content, tokens, temp).await
         }
@@ -199,7 +199,7 @@ async fn chat_abstract_summary<P: AsRef<Path>>(
         let csv = f;
 
         let summary = loop {
-            let res = openai_nlp(content.clone(), None, Some(0.5)).await;
+            let res = openai_nlp(content.clone(), None, Some(0.2)).await;
             match res {
                 Ok(s) => {
                     break s;

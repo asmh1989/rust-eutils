@@ -36,6 +36,17 @@ pub fn get_download_path_by_time(file_type: &str, id: i64) -> String {
     }
 }
 
+pub fn get_download_path(file_type: &str) -> std::io::Result<(String, i64)> {
+    let now = chrono::Utc::now().timestamp_millis();
+    let file_name = get_download_path_by_time(file_type, now);
+
+    let path = std::path::Path::new(&file_name);
+    let prefix = path.parent().unwrap();
+    std::fs::create_dir_all(prefix)?;
+
+    Ok((file_name, now))
+}
+
 pub fn file_exist(path: &str) -> bool {
     let meta = fs::metadata(path);
     if let Ok(m) = meta {
@@ -55,7 +66,7 @@ pub fn file_exist(path: &str) -> bool {
 pub fn read_target_csv<P: AsRef<Path>>(
     path: P,
     v: &mut Vec<PaperCsvResult>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // let file = File::open(path)?;
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b',')

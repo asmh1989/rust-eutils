@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::{fs::File, io};
 
-use crate::utils::{file_exist, get_download_path_by_time, get_pmid_path_by_id};
+use crate::utils::{file_exist, get_download_path, get_pmid_path_by_id};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -171,6 +171,31 @@ pub struct PaperCsvResult {
     pub epub_month: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "PascalCase")]
+pub struct PaperCsvSummary {
+    #[serde(rename = "PMID")]
+    pub pmid: String,
+    pub title: String,
+    #[serde(rename = "PubDateYear")]
+    pub pubdate_year: String,
+    #[serde(rename = "PubDateMonth")]
+    pub pubdate_month: String,
+    pub journal_title: String,
+    pub journal_abbr: String,
+    pub r#abstract: String,
+    pub author_first: String,
+    pub author_last: String,
+    pub publication_type: String,
+    #[serde(rename = "DOI")]
+    pub doi: String,
+    #[serde(rename = "ISSN")]
+    pub issn: String,
+    pub epub_year: String,
+    pub epub_month: String,
+    pub summary: String,
+}
+
 impl PaperCsvResult {
     fn get_row_str(&self) -> String {
         return format!(
@@ -226,12 +251,7 @@ impl PaperCsvResult {
     }
 
     pub fn save_list_csv(list: &Vec<PaperCsvResult>) -> io::Result<serde_json::Value> {
-        let now = chrono::Utc::now().timestamp_millis();
-        let file_name = get_download_path_by_time("csv", now);
-
-        let path = std::path::Path::new(&file_name);
-        let prefix = path.parent().unwrap();
-        std::fs::create_dir_all(prefix)?;
+        let (file_name, now) = get_download_path("csv")?;
 
         // 创建文件并写入标题行
         let mut file: File = File::create(file_name)?;
@@ -246,5 +266,25 @@ impl PaperCsvResult {
         writeln!(file, "{}", c)?;
 
         Ok(serde_json::json!({ "id": now }))
+    }
+
+    pub fn to_summary(&self, summary: String) -> PaperCsvSummary {
+        PaperCsvSummary {
+            pmid: self.pmid.clone(),
+            title: self.title.clone(),
+            pubdate_year: self.pubdate_year.clone(),
+            pubdate_month: self.pubdate_month.clone(),
+            journal_title: self.journal_title.clone(),
+            journal_abbr: self.journal_abbr.clone(),
+            r#abstract: self.r#abstract.clone(),
+            author_first: self.author_first.clone(),
+            author_last: self.author_last.clone(),
+            publication_type: self.publication_type.clone(),
+            doi: self.doi.clone(),
+            issn: self.issn.clone(),
+            epub_year: self.epub_year.clone(),
+            epub_month: self.epub_month.clone(),
+            summary,
+        }
     }
 }

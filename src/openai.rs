@@ -1,10 +1,17 @@
+use async_recursion::async_recursion;
+use csv::{QuoteStyle, WriterBuilder};
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION};
 use rocket::{form::FromForm, post, response::content};
 use serde::{Deserialize, Serialize};
-use std::error::Error;
+use std::path::Path;
+use std::{error::Error, time::Duration};
+use tokio::time::sleep;
 
 use crate::response::{response_error, response_ok};
 use rocket::serde::json::Json;
+
+use rocket::form::Form;
+use rocket::fs::{NamedFile, TempFile};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
@@ -26,7 +33,7 @@ pub struct CompletionRequest {
 pub struct Choice {
     pub index: i32,
     pub message: Message,
-    pub finish_reason: String,
+    pub finish_reason: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -38,7 +45,7 @@ pub struct Usage {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompletionResponse {
-    pub id: String,
+    pub id: Option<String>,
     pub object: String,
     pub created: i64,
     pub choices: Vec<Choice>,
@@ -52,17 +59,21 @@ pub struct ChatRequest<'r> {
     pub temperature: Option<f64>,
 }
 
+#[async_recursion]
 pub async fn openai_nlp(
     content: String,
     tokens: Option<u64>,
     temp: Option<f64>,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<String, Box<dyn Error + Send + Sync>> {
     let url = "https://api.openai.com/v1/chat/completions";
     let max_tokens = tokens.unwrap_or(2048);
     let temperature = temp.unwrap_or(0.2);
     let model = "gpt-3.5-turbo".to_owned();
     let role = "user".to_owned();
-    let messages = vec![Message { role, content }];
+    let messages = vec![Message {
+        role,
+        content: content.clone(),
+    }];
 
     let request_data = CompletionRequest {
         max_tokens,
@@ -80,31 +91,71 @@ pub async fn openai_nlp(
         HeaderValue::from_str(&format!("Bearer {}", api_key))?,
     );
 
+    let short_string: String = content
+        .split_whitespace()
+        .take(16)
+        .collect::<Vec<_>>()
+        .join(" ");
+    log::info!("start openai_content = {}...", short_string);
     let client = reqwest::Client::builder()
         .proxy(reqwest::Proxy::https("http://192.168.2.25:7890")?)
         .build()?;
-    let response = client
+
+    let res = client
         .post(url)
         .headers(headers)
         .json(&request_data)
         .send()
-        .await?
-        // .text()
-        .json::<CompletionResponse>()
         .await?;
-    let msg = response.choices[0].message.content.trim();
-    log::info!(
-        "total_tokens = {:#?}, message= {}",
-        response.usage.total_tokens,
-        msg
-    );
+    let text = res.text().await?;
+    match serde_json::from_str::<CompletionResponse>(&text) {
+        Ok(response) => {
+            let msg = response.choices[0].message.content.trim();
+            log::info!(
+                "total_tokens = {:#?}, message = {}",
+                response.usage.total_tokens,
+                msg
+            );
 
-    Ok(msg.to_owned())
+            Ok(msg.to_owned())
+        }
+        Err(err) => {
+            log::info!("res = {}, err = {:?}", &text, err);
+            sleep(Duration::from_secs(1)).await;
+
+            openai_nlp(content, tokens, temp).await
+        }
+    }
+}
+
+#[derive(FromForm)]
+pub struct Upload<'r> {
+    pub question: &'r str,
+    pub file: TempFile<'r>,
+}
+
+#[post("/openai/summary", data = "<req>")]
+pub async fn openai_chat_summary_file(req: Form<Upload<'_>>) -> Option<NamedFile> {
+    let res = req.file.path();
+    if res.is_none() {
+        log::info!("summary temp file path = {:?}, failed", &res);
+        None
+    } else {
+        let p = res.unwrap();
+
+        log::info!("summary path={:?}, question={}", p, req.question);
+        match chat_abstract_summary(p, req.question).await {
+            Ok(pp) => NamedFile::open(&pp).await.ok(),
+            Err(err) => {
+                log::info!("summary error = {:?}", err);
+                None
+            }
+        }
+    }
 }
 
 #[post("/openai/chat", format = "json", data = "<req>")]
 pub async fn openai_chat(req: Json<ChatRequest<'_>>) -> content::RawJson<String> {
-    log::info!("start openai_chat .. ");
     let res =
         crate::openai::openai_nlp(req.content.to_owned(), req.max_tokens, req.temperature).await;
 
@@ -116,6 +167,60 @@ pub async fn openai_chat(req: Json<ChatRequest<'_>>) -> content::RawJson<String>
     }
 }
 
+fn save_to_file<T: Serialize>(
+    name: &str,
+    v: &Vec<T>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut writer = WriterBuilder::new()
+        .quote_style(QuoteStyle::Necessary)
+        .from_path(name)?;
+
+    for person in v {
+        writer.serialize(person)?;
+    }
+
+    writer.flush()?;
+
+    Ok(())
+}
+
+async fn chat_abstract_summary<P: AsRef<Path>>(
+    path: P,
+    question: &str,
+) -> Result<String, Box<dyn Error + Send + Sync>> {
+    let mut v = Vec::new();
+
+    crate::utils::read_target_csv(path, &mut v)?;
+
+    let mut rr = Vec::with_capacity(v.len());
+
+    for f in v {
+        let content = format!("Answer me {} in one sentence after reading the following paragraph. Here is the paragraph: {}", question, &f.r#abstract);
+        let csv = f;
+
+        let summary = loop {
+            let res = openai_nlp(content.clone(), None, Some(0.5)).await;
+            match res {
+                Ok(s) => {
+                    break s;
+                }
+                Err(err) => {
+                    log::info!("openai_nlp error = {:?}, will retry", err);
+                }
+            }
+
+            sleep(Duration::from_secs(3)).await;
+        };
+
+        rr.push(csv.to_summary(summary));
+    }
+
+    let (file_name, _) = crate::utils::get_download_path("csv")?;
+    save_to_file(&file_name, &rr)?;
+
+    Ok(file_name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,6 +230,19 @@ mod tests {
         crate::config::init_config();
         let prompt = "hello".to_owned();
         log::info!("result = {:?}", openai_nlp(prompt, None, None).await);
+    }
+
+    #[tokio::test]
+    async fn test_summary() {
+        crate::config::init_config();
+        log::info!(
+            "result = {:?}",
+            chat_abstract_summary(
+                "data/paper.csv",
+                "what is the relation between FXR and NLRP3"
+            )
+            .await
+        );
     }
 
     #[tokio::test]

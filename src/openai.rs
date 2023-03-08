@@ -26,6 +26,8 @@ pub struct CompletionRequest {
     pub messages: Vec<Message>,
     pub max_tokens: u64,
     pub temperature: f64,
+    pub top_p: f64,
+    pub presence_penalty: f64,
 }
 
 // 定义响应数据类型
@@ -60,55 +62,81 @@ pub struct ChatRequest {
 }
 
 const DEALY_TIME: u64 = 4;
+const USE_CHATGPT_API: bool = true;
 #[async_recursion]
 pub async fn openai_nlp(
     content: String,
     tokens: Option<u64>,
     temp: Option<f64>,
 ) -> Result<String, Box<dyn Error + Send + Sync>> {
-    let url = "https://api.openai.com/v1/chat/completions";
-    let max_tokens = tokens.unwrap_or(2048);
-    let temperature = temp.unwrap_or(0.2);
-    let model = "gpt-3.5-turbo".to_owned();
-    let role = "user".to_owned();
-    let messages = vec![Message {
-        role,
-        content: content.clone(),
-    }];
+    let text = if USE_CHATGPT_API {
+        let url = "http://192.168.2.212:3002/api/sendMessage";
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+        let client = reqwest::Client::builder().build()?;
 
-    let request_data = CompletionRequest {
-        max_tokens,
-        temperature,
-        model,
-        messages,
+        let request_data = serde_json::json!({
+            "content": content.clone(),
+        });
+
+        let res = client
+            .post(url)
+            .headers(headers)
+            .json(&request_data)
+            .send()
+            .await?;
+        res.text().await?
+    } else {
+        let max_tokens = tokens.unwrap_or(2048);
+        let temperature = temp.unwrap_or(0.8);
+        let model = "gpt-3.5-turbo".to_owned();
+        let role = "user".to_owned();
+        let messages = vec![Message {
+            role,
+            content: content.clone(),
+        }];
+
+        let presence_penalty = 1.0;
+        let top_p = 1.0;
+
+        let request_data = CompletionRequest {
+            max_tokens,
+            temperature,
+            model,
+            messages,
+            top_p,
+            presence_penalty,
+        };
+        let url = "https://api.openai.com/v1/chat/completions";
+
+        let api_key = "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";
+
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", api_key))?,
+        );
+
+        let short_string: String = content
+            .split_whitespace()
+            .take(16)
+            .collect::<Vec<_>>()
+            .join(" ");
+        log::info!("start openai_content = {}...", short_string);
+        let client = reqwest::Client::builder()
+            .proxy(reqwest::Proxy::https("http://192.168.2.25:7890")?)
+            .build()?;
+
+        let res = client
+            .post(url)
+            .headers(headers)
+            .json(&request_data)
+            .send()
+            .await?;
+        res.text().await?
     };
 
-    let api_key = "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";
-
-    let mut headers = HeaderMap::new();
-    headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
-    headers.insert(
-        AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {}", api_key))?,
-    );
-
-    let short_string: String = content
-        .split_whitespace()
-        .take(16)
-        .collect::<Vec<_>>()
-        .join(" ");
-    log::info!("start openai_content = {}...", short_string);
-    let client = reqwest::Client::builder()
-        .proxy(reqwest::Proxy::https("http://192.168.2.25:7890")?)
-        .build()?;
-
-    let res = client
-        .post(url)
-        .headers(headers)
-        .json(&request_data)
-        .send()
-        .await?;
-    let text = res.text().await?;
     match serde_json::from_str::<CompletionResponse>(&text) {
         Ok(response) => {
             let msg = response.choices[0].message.content.trim();
@@ -203,7 +231,7 @@ async fn chat_abstract_summary<P: AsRef<Path>>(
         let csv = f;
 
         let summary = loop {
-            let res = openai_nlp(content.clone(), None, Some(0.2)).await;
+            let res = openai_nlp(content.clone(), None, None).await;
             match res {
                 Ok(s) => {
                     break s;

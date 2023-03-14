@@ -5,7 +5,7 @@ use std::net::Ipv4Addr;
 use response::response_ok;
 use rocket::{
     fairing::{Fairing, Info, Kind},
-    fs::{relative, NamedFile},
+    fs::NamedFile,
     get,
     http::Header,
     info, launch,
@@ -166,10 +166,7 @@ async fn rocket() -> _ {
                 crate::openai::openai_chat_summary_file
             ],
         )
-        .mount(
-            "/",
-            rocket::fs::FileServer::from(relative!("../vue-eutils/dist")),
-        )
+        .mount("/", rocket::fs::FileServer::from("./web/dist"))
         .mount("/", routes![get_pubmed])
         .mount("/download", routes![download])
 }

@@ -1,0 +1,4 @@
+*/data
+**/data
+/target
+!/target/release/rust-eutils

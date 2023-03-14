@@ -1,0 +1,11 @@
+version: "3"
+
+services:
+  app:
+    image: asmh1989/rust-eutils
+    restart: always
+    container_name: rust-eutils
+    ports:
+      - 4321:4321
+    volumes:
+      - ./data:/app/data

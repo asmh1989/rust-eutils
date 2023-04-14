@@ -7,6 +7,7 @@ use std::path::Path;
 use std::{error::Error, time::Duration};
 use tokio::time::sleep;
 
+use crate::model::PaperCsvResult;
 use crate::response::{response_error, response_ok};
 use rocket::serde::json::Json;
 
@@ -217,9 +218,9 @@ async fn chat_abstract_summary<P: AsRef<Path>>(
     path: P,
     question: &str,
 ) -> Result<String, Box<dyn Error + Send + Sync>> {
-    let mut v = Vec::new();
+    let mut v: Vec<PaperCsvResult> = Vec::new();
 
-    crate::utils::read_target_csv(path, &mut v)?;
+    crate::utils::read_target_csv(path, b',', &mut v)?;
 
     let mut rr = Vec::with_capacity(v.len());
 

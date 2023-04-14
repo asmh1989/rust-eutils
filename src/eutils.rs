@@ -19,18 +19,18 @@ pub fn init_work(work: Worker<i32>) {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SearchResult {
-    esearchresult: ESearchResult,
+pub struct SearchResult {
+    pub esearchresult: ESearchResult,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ESearchResult {
-    count: String,
-    retmax: String,
-    retstart: String,
-    idlist: Vec<String>,
+pub struct ESearchResult {
+    pub count: String,
+    pub retmax: String,
+    pub retstart: String,
+    pub idlist: Vec<String>,
     // translationset: Vec<String>,
-    querytranslation: String,
+    pub querytranslation: String,
 }
 
 static ESEARCH: &str = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?";
@@ -86,7 +86,7 @@ pub async fn esearch2(
     }))
 }
 
-async fn fetch_ids(
+pub async fn fetch_ids(
     db: &str,
     query: &str,
     retstart: usize,
@@ -99,7 +99,7 @@ async fn fetch_ids(
     };
 
     let url = format!(
-            "{}db={}&term={}&retmode=json&api_key=f6bc4f0e30a718d326ef842054d988ecdd08&retstart={}&retmax={}",
+            "{}db={}&term={}&retmode=json&api_key=f6bc4f0e30a718d326ef842054d988ecdd08&sort=date&retstart={}&retmax={}",
             ESEARCH,
             &db,
             &url_encode(&query),
@@ -179,7 +179,7 @@ pub async fn efetch(
         let path = get_pmid_path_by_id(pmid);
         if !file_exist(&path) {
             let url = format!(
-            "{}db={}&api_key=f6bc4f0e30a718d326ef842054d988ecdd08&retmode=text&rettype=xml&id={}",
+            "{}db={}&api_key=f6bc4f0e30a718d326ef842054d988ecdd08&retmode=text&rettype=xml&sort=date&id={}",
             EFETCH, &db, id
         );
             log::info!("start download {}", pmid);
@@ -194,7 +194,7 @@ pub async fn efetch(
         } else {
             // log::info!("pmid = {} already downloaded", pmid);
 
-            let result = read_target_csv(&path, &mut v);
+            let result = read_target_csv(&path, b',', &mut v);
             if result.is_err() {
                 log::warn!("path = {},  csv parse error = {:?}", &path, result);
                 let _ = std::fs::remove_file(&path);

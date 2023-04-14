@@ -1,6 +1,9 @@
 use std::{fs, os::unix::prelude::MetadataExt, path::Path};
 
 use chrono::Datelike;
+use csv::{QuoteStyle, WriterBuilder};
+use rocket::serde::DeserializeOwned;
+use serde::Serialize;
 
 use crate::model::PaperCsvResult;
 
@@ -63,19 +66,37 @@ pub fn file_exist(path: &str) -> bool {
     }
 }
 
-pub fn read_target_csv<P: AsRef<Path>>(
+pub fn read_target_csv<P: AsRef<Path>, T: DeserializeOwned>(
     path: P,
-    v: &mut Vec<PaperCsvResult>,
+    delimiter: u8,
+    v: &mut Vec<T>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // let file = File::open(path)?;
     let mut rdr = csv::ReaderBuilder::new()
-        .delimiter(b',')
+        .delimiter(delimiter)
         .has_headers(true)
         .from_path(path)?;
     for result in rdr.deserialize() {
-        let ele: PaperCsvResult = result?;
+        let ele: T = result?;
         v.push(ele);
     }
+
+    Ok(())
+}
+
+pub fn save_to_file<T: Serialize>(
+    name: &str,
+    v: &Vec<T>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut writer = WriterBuilder::new()
+        .quote_style(QuoteStyle::Necessary)
+        .from_path(name)?;
+
+    for person in v {
+        writer.serialize(person)?;
+    }
+
+    writer.flush()?;
 
     Ok(())
 }
@@ -90,8 +111,8 @@ mod tests {
     fn test_parse_csv() {
         crate::config::init_config();
         let path = "data/pmid/37000000/753000/36752498.csv";
-        let mut vec = Vec::new();
-        let result = read_target_csv(path, &mut vec);
+        let mut vec: Vec<PaperCsvResult> = Vec::new();
+        let result = read_target_csv(path, b',', &mut vec);
 
         info!("result = {:?}", result);
         info!("csv = {}", serde_json::to_string_pretty(&vec).unwrap());

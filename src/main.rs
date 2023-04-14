@@ -18,6 +18,7 @@ use utils::{file_exist, get_download_path_by_time, get_pmid_path_by_id};
 use crate::response::response_error;
 
 mod config;
+mod disease;
 mod eutils;
 mod model;
 mod openai;

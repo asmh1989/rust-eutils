@@ -5,8 +5,6 @@ use csv::{QuoteStyle, WriterBuilder};
 use rocket::serde::DeserializeOwned;
 use serde::Serialize;
 
-use crate::model::PaperCsvResult;
-
 pub fn get_pmid_path_by_id(id: usize) -> String {
     let million: usize = 1000000;
     let thousand: usize = 1000;
@@ -104,6 +102,8 @@ pub fn save_to_file<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use log::info;
+
+    use crate::model::PaperCsvResult;
 
     use super::*;
 

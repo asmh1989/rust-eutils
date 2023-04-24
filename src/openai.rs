@@ -7,6 +7,7 @@ use std::path::Path;
 use std::{error::Error, time::Duration};
 use tokio::time::sleep;
 
+use crate::eutils::esearch3;
 use crate::model::PaperCsvResult;
 use crate::response::{response_error, response_ok};
 use rocket::serde::json::Json;
@@ -164,6 +165,30 @@ pub struct Upload<'r> {
     pub file: TempFile<'r>,
 }
 
+#[derive(FromForm)]
+pub struct UploadQuery<'r> {
+    pub question: &'r str,
+    pub query: &'r str,
+    pub page_size: usize,
+}
+
+#[post("/openai/summary_with_query", data = "<req>")]
+pub async fn openai_chat_summary_file2(req: Form<UploadQuery<'_>>) -> content::RawJson<String> {
+    log::info!(
+        "summary query={}, question={}, page_size = {}",
+        req.query,
+        req.question,
+        req.page_size
+    );
+    match chat_abstract_summary2(req.query, req.question, req.page_size).await {
+        Ok(pp) => response_ok(serde_json::json!({ "id": pp })),
+        Err(err) => {
+            log::info!("summary error = {:?}", err);
+            response_error(format!("summary error = {:?}", err))
+        }
+    }
+}
+
 #[post("/openai/summary", data = "<req>")]
 pub async fn openai_chat_summary_file(req: Form<Upload<'_>>) -> Option<NamedFile> {
     let res = req.file.path();
@@ -252,6 +277,52 @@ async fn chat_abstract_summary<P: AsRef<Path>>(
     save_to_file(&file_name, &rr)?;
 
     Ok(file_name)
+}
+
+async fn chat_abstract_summary2(
+    query: &str,
+    question: &str,
+    page_size: usize,
+) -> Result<String, Box<dyn Error + Send + Sync>> {
+    let p = if page_size < 1 {
+        1
+    } else if page_size > 20 {
+        20
+    } else {
+        page_size
+    };
+    let v = esearch3("pubmed", query, None, Some(p)).await?;
+
+    let mut rr = Vec::with_capacity(v.len());
+
+    for f in v {
+        let content = format!(
+            "Answer me {} in one sentence after reading the following paragraph: {}",
+            question, &f.r#abstract
+        );
+        let csv = f;
+
+        let summary = loop {
+            let res = openai_nlp(content.clone(), None, None).await;
+            match res {
+                Ok(s) => {
+                    break s;
+                }
+                Err(err) => {
+                    log::info!("openai_nlp error = {:?}, will retry", err);
+                }
+            }
+
+            sleep(Duration::from_secs(DEALY_TIME)).await;
+        };
+
+        rr.push(csv.to_summary(summary));
+    }
+
+    let (file_name, id) = crate::utils::get_download_path("csv")?;
+    save_to_file(&file_name, &rr)?;
+
+    Ok(id.to_string())
 }
 
 #[cfg(test)]

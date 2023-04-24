@@ -164,7 +164,8 @@ async fn rocket() -> _ {
                 query_pubmed_and_save,
                 // openai_chat_form,
                 crate::openai::openai_chat,
-                crate::openai::openai_chat_summary_file
+                crate::openai::openai_chat_summary_file,
+                crate::openai::openai_chat_summary_file2
             ],
         )
         .mount("/", rocket::fs::FileServer::from("./web/dist"))

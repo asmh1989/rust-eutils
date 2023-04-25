@@ -165,6 +165,26 @@ pub struct Upload<'r> {
     pub file: TempFile<'r>,
 }
 
+#[post("/openai/summary", data = "<req>")]
+pub async fn openai_chat_summary_file(req: Form<Upload<'_>>) -> Option<NamedFile> {
+    let res = req.file.path();
+    if res.is_none() {
+        log::info!("summary temp file path = {:?}, failed", &res);
+        None
+    } else {
+        let p = res.unwrap();
+
+        log::info!("summary path={:?}, question={}", p, req.question);
+        match chat_abstract_summary(p, req.question).await {
+            Ok(pp) => NamedFile::open(&pp).await.ok(),
+            Err(err) => {
+                log::info!("summary error = {:?}", err);
+                None
+            }
+        }
+    }
+}
+
 #[derive(FromForm)]
 pub struct UploadQuery<'r> {
     pub question: &'r str,
@@ -185,26 +205,6 @@ pub async fn openai_chat_summary_file2(req: Form<UploadQuery<'_>>) -> content::R
         Err(err) => {
             log::info!("summary error = {:?}", err);
             response_error(format!("summary error = {:?}", err))
-        }
-    }
-}
-
-#[post("/openai/summary", data = "<req>")]
-pub async fn openai_chat_summary_file(req: Form<Upload<'_>>) -> Option<NamedFile> {
-    let res = req.file.path();
-    if res.is_none() {
-        log::info!("summary temp file path = {:?}, failed", &res);
-        None
-    } else {
-        let p = res.unwrap();
-
-        log::info!("summary path={:?}, question={}", p, req.question);
-        match chat_abstract_summary(p, req.question).await {
-            Ok(pp) => NamedFile::open(&pp).await.ok(),
-            Err(err) => {
-                log::info!("summary error = {:?}", err);
-                None
-            }
         }
     }
 }

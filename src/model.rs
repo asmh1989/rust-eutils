@@ -6,10 +6,10 @@ use crate::utils::{file_exist, get_download_path, get_pmid_path_by_id};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GeneDisease {
-    pub gene: String,
     pub disease: String,
-    pub n_pubmed_minging: Option<usize>,
+    pub gene: String,
     pub last_ref_year_mining: Option<usize>,
+    pub n_pubmed_minging: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

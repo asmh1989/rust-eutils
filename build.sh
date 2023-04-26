@@ -1,5 +1,8 @@
 #!/bin/bash
-
+rm -rf web/dist
+echo "0. start build front..."
+cd ../vue-eutils && npm run build
+cd - 
 echo "1. start build --release..."
 cargo build --release
 echo "2. rebuild docker image..."

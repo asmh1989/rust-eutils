@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, path::PathBuf};
 
 use response::response_ok;
 use rocket::{
     fairing::{Fairing, Info, Kind},
-    fs::NamedFile,
+    fs::{FileServer, NamedFile},
     get,
     http::Header,
     info, launch,
@@ -19,6 +19,7 @@ use crate::response::response_error;
 
 mod config;
 mod disease;
+mod dual;
 mod eutils;
 mod model;
 mod openai;
@@ -143,6 +144,20 @@ async fn download(file_type: String, id: i64) -> Option<NamedFile> {
 //         response_error(err)
 //     }
 // }
+#[get("/<file..>", rank = 999)]
+async fn static_files(file: PathBuf) -> Option<NamedFile> {
+    let mut path = PathBuf::new();
+    path.push("data/dual/");
+    path.push(file);
+    // log::info!("path = {:?}", &path);
+
+    let r = NamedFile::open(path).await;
+    if r.is_err() {
+        NamedFile::open("./data/logo.png").await.ok()
+    } else {
+        r.ok()
+    }
+}
 
 #[launch]
 async fn rocket() -> _ {
@@ -152,6 +167,8 @@ async fn rocket() -> _ {
     cfg.address = Ipv4Addr::new(0, 0, 0, 0).into();
     cfg.log_level = LogLevel::Normal;
     cfg.port = 4321;
+
+    // let options = Options::Index | Options::DotFiles;
 
     rocket::custom(cfg)
         .attach(Cors) // cors
@@ -167,9 +184,17 @@ async fn rocket() -> _ {
                 crate::openai::openai_chat_summary_file,
                 crate::openai::openai_chat_summary_file2,
                 crate::disease::query_disease_gene_,
+                crate::dual::dual_list,
+                crate::dual::dual_target_info,
+                crate::dual::dual_gen_cpds,
             ],
         )
-        .mount("/", rocket::fs::FileServer::from("./web/dist"))
+        .mount("/", FileServer::from("./web/dist"))
+        .mount("/dual", routes![static_files])
+        // .mount(
+        //     "/dual",
+        //     FileServer::new("./data/dual", Options::default()).rank(999),
+        // )
         .mount("/", routes![get_pubmed])
         .mount("/download", routes![download])
 }

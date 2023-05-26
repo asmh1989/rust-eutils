@@ -73,6 +73,13 @@ struct GenCPDs {
     pub right_article_doi: String,
     #[serde(rename = "Right_PatentNumber")]
     pub right_patent_number: String,
+
+    #[serde(rename = "JAK1ToJAK2_mean", skip_serializing_if = "Option::is_none")]
+    pub jak1_to_jak2_mean: Option<f64>,
+    #[serde(rename = "JAK1ToJAK2_std", skip_serializing_if = "Option::is_none")]
+    pub jak1_to_jak2_std: Option<f64>,
+    #[serde(rename = "JAK1ToJAK2_median", skip_serializing_if = "Option::is_none")]
+    pub jak1_to_jak2_median: Option<f64>,
 }
 
 fn get_dual_list() -> Vec<String> {

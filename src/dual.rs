@@ -24,6 +24,10 @@ struct Motifs {
     #[serde(rename = "median")]
     pub median: f64,
 
+    #[serde(rename = "ArticleDOI")]
+    pub article_doi: Option<String>,
+    #[serde(rename = "PatentNumber")]
+    pub patent_number: Option<String>,
     pub img1: Option<String>,
     pub img2: Option<String>,
 }

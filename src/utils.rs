@@ -2,8 +2,7 @@ use std::{fs, os::unix::prelude::MetadataExt, path::Path};
 
 use chrono::Datelike;
 use csv::{QuoteStyle, WriterBuilder};
-use rocket::serde::DeserializeOwned;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 
 pub fn get_pmid_path_by_id(id: usize) -> String {
     let million: usize = 1000000;
@@ -97,24 +96,4 @@ pub fn save_to_file<T: Serialize>(
     writer.flush()?;
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use log::info;
-
-    use crate::model::PaperCsvResult;
-
-    use super::*;
-
-    #[test]
-    fn test_parse_csv() {
-        crate::config::init_config();
-        let path = "data/pmid/37000000/753000/36752498.csv";
-        let mut vec: Vec<PaperCsvResult> = Vec::new();
-        let result = read_target_csv(path, b',', &mut vec);
-
-        info!("result = {:?}", result);
-        info!("csv = {}", serde_json::to_string_pretty(&vec).unwrap());
-    }
 }

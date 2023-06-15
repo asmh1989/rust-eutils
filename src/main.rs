@@ -157,7 +157,7 @@ async fn smiles_files(smiles: String) -> Option<NamedFile> {
 
     let r = NamedFile::open(path).await;
     if r.is_err() {
-        NamedFile::open("./data/logo.png").await.ok()
+        NamedFile::open("./data/*.svg").await.ok()
     } else {
         r.ok()
     }

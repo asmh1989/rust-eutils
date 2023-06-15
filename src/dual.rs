@@ -7,6 +7,7 @@ use rocket::{get, response::content};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    linker::{get_link, get_pair},
     response::response_ok,
     utils::{file_exist, read_target_csv},
 };
@@ -214,7 +215,20 @@ pub async fn dual_target_info(target: String, left_or_right: usize) -> content::
         "dual_target_info .. target = {} left_or_right = {}",
         &target, left_or_right
     );
-    response_ok(serde_json::to_value(get_target_info(&target, left_or_right == 0)).unwrap())
+    if target.contains("-LINK") {
+        response_ok(
+            serde_json::to_value(crate::linker::get_target_info(&target, left_or_right == 0))
+                .unwrap(),
+        )
+    } else {
+        response_ok(serde_json::to_value(get_target_info(&target, left_or_right == 0)).unwrap())
+    }
+}
+
+#[get("/dual/pair?<target>&<link>")]
+pub async fn dual_pair(target: String, link: String) -> content::RawJson<String> {
+    info!("dual_link .. target = {} link = {}", &target, link);
+    response_ok(serde_json::to_value(get_pair(&target, &link)).unwrap())
 }
 
 #[get("/dual/<target>/<left>/<right>")]
@@ -227,7 +241,12 @@ pub async fn dual_gen_cpds(
         "dual_gen_cpds .. target = {} left = {}, right = {}",
         &target, &left, &right
     );
-    response_ok(serde_json::to_value(get_gen_cpds(&target, &left, &right).await).unwrap())
+
+    if target.contains("-LINK") {
+        response_ok(serde_json::to_value(get_link(&target, &left, &right)).unwrap())
+    } else {
+        response_ok(serde_json::to_value(get_gen_cpds(&target, &left, &right).await).unwrap())
+    }
 }
 
 #[cfg(test)]

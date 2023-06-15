@@ -28,3 +28,5 @@ regex = "1.7.1"
 csv = "1.2"
 
 async-recursion = "1.0.2"
+
+urlencoding = "2.1.2"

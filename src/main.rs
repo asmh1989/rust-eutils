@@ -13,6 +13,7 @@ use rocket::{
     response::content,
     routes, Request, Response,
 };
+use urlencoding::encode;
 use utils::{file_exist, get_download_path_by_time, get_pmid_path_by_id};
 
 use crate::response::response_error;
@@ -21,6 +22,7 @@ mod config;
 mod disease;
 mod dual;
 mod eutils;
+mod linker;
 mod model;
 mod openai;
 mod response;
@@ -102,7 +104,7 @@ async fn get_pubmed_by_id(pmid: String) -> content::RawJson<String> {
 
 #[get("/pubmed/<pmid>")]
 async fn get_pubmed(pmid: String) -> Option<NamedFile> {
-    let res = pmid.parse::<usize>();
+    let res: Result<usize, std::num::ParseIntError> = pmid.parse::<usize>();
     if let Ok(id) = res {
         let path = get_pmid_path_by_id(id);
         if file_exist(&path) {
@@ -131,25 +133,27 @@ async fn download(file_type: String, id: i64) -> Option<NamedFile> {
     }
 }
 
-// #[post("/openai/chat2", data = "<req>")]
-// async fn openai_chat_form(req: Form<ChatRequest<'_>>) -> content::RawJson<String> {
-//     log::info!("start openai_chat .. {:?}", &req);
-//     let res =
-//         crate::openai::openai_nlp(req.content.to_owned(), req.max_tokens, req.temperature).await;
-
-//     if let Ok(r) = res {
-//         response_ok(serde_json::to_value(r).unwrap())
-//     } else {
-//         let err = res.err().unwrap().to_string();
-//         response_error(err)
-//     }
-// }
-#[get("/<file..>", rank = 999)]
+#[get("/<file..>", rank = 998)]
 async fn static_files(file: PathBuf) -> Option<NamedFile> {
     let mut path = PathBuf::new();
     path.push("data/dual/");
     path.push(file);
     // log::info!("path = {:?}", &path);
+
+    let r = NamedFile::open(path).await;
+    if r.is_err() {
+        NamedFile::open("./data/logo.png").await.ok()
+    } else {
+        r.ok()
+    }
+}
+
+#[get("/<smiles>", rank = 999)]
+async fn smiles_files(smiles: String) -> Option<NamedFile> {
+    let mut path = PathBuf::new();
+    path.push("data/SMILES");
+    path.push(format!("{}.svg", encode(&smiles)));
+    log::info!("path = {:?}", &path);
 
     let r = NamedFile::open(path).await;
     if r.is_err() {
@@ -187,10 +191,12 @@ async fn rocket() -> _ {
                 crate::dual::dual_list,
                 crate::dual::dual_target_info,
                 crate::dual::dual_gen_cpds,
+                crate::dual::dual_pair,
             ],
         )
         .mount("/", FileServer::from("./web/dist"))
         .mount("/dual", routes![static_files])
+        .mount("/smiles", routes![smiles_files])
         // .mount(
         //     "/dual",
         //     FileServer::new("./data/dual", Options::default()).rank(999),

@@ -6,7 +6,7 @@ cd -
 echo "1. start build --release..."
 cargo build --release
 echo "2. rebuild docker image..."
-sudo docker build -t asmh1989/rust-eutils .
+sudo docker build -t asmh1989/rust-eutils:2.0 .
 echo "3. restart docker-compose..."
 sudo docker-compose up -d
 echo "done..."

@@ -110,12 +110,11 @@ async fn send_notification(c: &str) -> Result<(), Box<dyn std::error::Error + Se
 
 fn succ_notification(job: &JobInDb, local: &str) -> String {
     format!(
-        r#"## {} jobId-{} 已完成
-            
-    * 名称: {}
-    * 耗时: {} 秒
-    * 云上: {}
-    * 本地: {}"#,
+        r#"## {} jobId-{} 已完成      
+* 名称: {}
+* 耗时: {} 秒
+* 云上: {}
+* 本地: {}"#,
         &job.cloud, job.job_id, &job.job_name, job.elapsed_raw, &job.work_dir, local
     )
 }
@@ -123,15 +122,13 @@ fn succ_notification(job: &JobInDb, local: &str) -> String {
 fn failed_notification(job: &JobInDb) -> String {
     format!(
         r#"## {} jobId-{} 失败了
+- 名称: {}
+- 云上: {}
 
-        - 名称: {}
-        - 云上: {}
-        
-        ```
-        日志:
-        {}
-        ```
-        "#,
+```
+日志:
+{}
+```"#,
         &job.cloud,
         job.job_id,
         &job.job_name,

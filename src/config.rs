@@ -2,7 +2,7 @@ use crossbeam_deque::Worker;
 use log::LevelFilter;
 use log4rs::{
     append::{console::ConsoleAppender, file::FileAppender},
-    config::{Appender, Root},
+    config::{Appender, Logger, Root},
     encode::pattern::PatternEncoder,
 };
 
@@ -34,6 +34,7 @@ fn init_log() {
     let config = log4rs::Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
         .appender(Appender::builder().build("file", Box::new(file)))
+        .logger(Logger::builder().build("ssh_rs", LevelFilter::Off))
         .build(
             Root::builder()
                 .appender("stdout")

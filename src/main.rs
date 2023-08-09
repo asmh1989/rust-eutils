@@ -26,6 +26,7 @@ mod linker;
 mod model;
 mod openai;
 mod response;
+mod slurm;
 mod utils;
 
 #[get("/pubmed/<term>?<cur_page>&<page_size>")]
@@ -166,11 +167,14 @@ async fn smiles_files(smiles: String) -> Option<NamedFile> {
 #[launch]
 async fn rocket() -> _ {
     crate::config::init_config();
+    crate::slurm::init().await;
+
+    crate::slurm::start_timetask();
 
     let mut cfg = rocket::config::Config::default();
     cfg.address = Ipv4Addr::new(0, 0, 0, 0).into();
     cfg.log_level = LogLevel::Normal;
-    cfg.port = 4321;
+    cfg.port = 14321;
 
     // let options = Options::Index | Options::DotFiles;
 

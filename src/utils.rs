@@ -81,6 +81,24 @@ pub fn read_target_csv<P: AsRef<Path>, T: DeserializeOwned>(
     Ok(())
 }
 
+pub fn read_csv_from_str<T: DeserializeOwned>(
+    path: &str,
+    delimiter: u8,
+    v: &mut Vec<T>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // let file = File::open(path)?;
+    let mut rdr = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .has_headers(true)
+        .from_reader(path.as_bytes());
+    for result in rdr.deserialize() {
+        let ele: T = result?;
+        v.push(ele);
+    }
+
+    Ok(())
+}
+
 pub fn save_to_file<T: Serialize>(
     name: &str,
     v: &Vec<T>,

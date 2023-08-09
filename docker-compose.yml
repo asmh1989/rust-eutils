@@ -9,3 +9,5 @@ services:
       - 4321:4321
     volumes:
       - ./data:/app/data
+      - /mnt:/mnt
+      - /public:/public

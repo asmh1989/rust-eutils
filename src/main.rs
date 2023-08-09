@@ -174,7 +174,7 @@ async fn rocket() -> _ {
     let mut cfg = rocket::config::Config::default();
     cfg.address = Ipv4Addr::new(0, 0, 0, 0).into();
     cfg.log_level = LogLevel::Normal;
-    cfg.port = 14321;
+    cfg.port = 4321;
 
     // let options = Options::Index | Options::DotFiles;
 

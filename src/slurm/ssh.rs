@@ -146,7 +146,7 @@ pub fn sync_tgz(cloud: &Cloud, job: &JobInDb) {
             let md = job.md_name();
             let tgz_name = job.tgz_name();
             let command = format!(
-                "cd {} && tar zcf {} {}/fep/*/lambda*/*xvg",
+                "cd {} && tar cf {} {}/fep/*/lambda*/*xvg",
                 work_dir, tgz_name, md
             );
 

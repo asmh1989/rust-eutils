@@ -112,7 +112,7 @@ fn succ_notification(job: &JobInDb, local: &str) -> String {
     format!(
         r#"## {} jobId-{} 已完成      
 * 名称: {}
-* 耗时: {} 秒
+* 耗时: {}
 * 云上: {}
 * 本地: {}"#,
         &job.cloud,

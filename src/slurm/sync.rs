@@ -115,7 +115,12 @@ fn succ_notification(job: &JobInDb, local: &str) -> String {
 * 耗时: {} 秒
 * 云上: {}
 * 本地: {}"#,
-        &job.cloud, job.job_id, &job.job_name, job.elapsed_raw, &job.work_dir, local
+        &job.cloud,
+        job.job_id,
+        &job.job_name,
+        crate::utils::second_format(job.elapsed_raw as i64),
+        &job.work_dir,
+        local
     )
 }
 
@@ -241,6 +246,8 @@ pub async fn start_sync() {
 #[cfg(test)]
 mod tests {
 
+    use crate::utils::second_format;
+
     use super::*;
 
     #[tokio::test]
@@ -309,5 +316,17 @@ mod tests {
         log::info!("path = {}", p.display().to_string());
 
         // log::info!("get info = {:?}", get_info_path(str));
+    }
+
+    #[test]
+    fn test_seconds() {
+        crate::config::init_config();
+        let s = 25760;
+
+        log::info!("耗时: {}", second_format(s as i64));
+        log::info!("耗时: {}", second_format(1000));
+        log::info!("耗时: {}", second_format(40000));
+        log::info!("耗时: {}", second_format(400000));
+        log::info!("耗时: {}", second_format(124));
     }
 }

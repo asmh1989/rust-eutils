@@ -115,3 +115,22 @@ pub fn save_to_file<T: Serialize>(
 
     Ok(())
 }
+
+pub fn second_format(s: i64) -> String {
+    let duration = chrono::Duration::seconds(s);
+
+    let days = duration.num_days();
+    let hours = duration.num_hours() % 24;
+    let minutes = duration.num_minutes() % 60;
+    let seconds = duration.num_seconds() % 60;
+
+    if days > 0 {
+        format!("{}-{:02}:{:02}:{:02}", days, hours, minutes, seconds)
+    } else if hours > 0 {
+        format!("{}:{:02}:{:02}", hours, minutes, seconds)
+    } else if minutes > 0 {
+        format!("{}:{:02}", minutes, seconds)
+    } else {
+        format!("{} s", s)
+    }
+}

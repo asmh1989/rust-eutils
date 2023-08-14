@@ -111,9 +111,28 @@ impl JobInDb {
     pub fn local_dir(&self) -> String {
         let vv = self.work_dir.split(&self.user).collect::<Vec<&str>>();
         let local_dir = if vv.len() > 1 { vv[1] } else { "/tgz" };
-        format!("{}{}", ROOT_PATH, local_dir)
+        let dir = format!("{}{}", ROOT_PATH, local_dir);
+        let (d, _) = get_info_path(&dir);
+        if d.is_empty() {
+            format!("{}{}", ROOT_PATH, local_dir)
+        } else {
+            d.to_string()
+        }
     }
     pub fn local_tgz(&self) -> String {
         format!("{}/{}", self.local_dir(), self.tgz_name())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dir() {
+        let (a, b) = get_info_path(
+            "/mnt/share/cloud_sbatch/yrl/abfep/jak1/compare-new-restr/PRK-560_md/fep/",
+        );
+        println!("a = {}, b = {}", a, b);
     }
 }

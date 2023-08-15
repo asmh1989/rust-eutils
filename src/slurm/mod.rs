@@ -6,6 +6,7 @@ use self::sync::start_sync;
 
 mod config;
 mod db;
+mod dg;
 mod model;
 mod ssh;
 mod sync;

@@ -240,6 +240,7 @@ pub async fn start_sync() {
         }
 
         sync_cloud(&f).await;
+        super::dg::do_dg(&f).await;
     }
 }
 
